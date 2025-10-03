@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Base Tool - MCP 工具基礎類別
 
@@ -9,12 +10,30 @@ Base Tool - MCP 工具基礎類別
 - 結果快取
 """
 
-import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-from claude_agent_sdk import query, ClaudeAgentOptions
 import asyncio
+import io
+import json
+import re
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from claude_agent_sdk import ClaudeAgentOptions, query
+
+try:
+    from json_repair import repair_json
+    JSON_REPAIR_AVAILABLE = True
+except ImportError:
+    JSON_REPAIR_AVAILABLE = False
+
+# Windows console encoding fix
+if sys.platform == 'win32':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except AttributeError:
+        pass  # Already wrapped or not needed
 
 
 class BaseTool:
@@ -24,7 +43,8 @@ class BaseTool:
         self,
         tool_name: str,
         output_dir: str = "output/analysis",
-        prompt_template_file: Optional[str] = None
+        prompt_template_file: Optional[str] = None,
+        cache_expiration_days: int = 7
     ):
         """
         初始化
@@ -33,10 +53,12 @@ class BaseTool:
             tool_name: 工具名稱（用於輸出目錄）
             output_dir: 輸出根目錄
             prompt_template_file: Prompt 模板檔案名稱（在 prompts/ 目錄下）
+            cache_expiration_days: 快取過期天數（預設 7 天）
         """
         self.tool_name = tool_name
         self.output_dir = Path(output_dir) / tool_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_expiration_days = cache_expiration_days
 
         # 載入 Prompt 模板
         self.prompt_template = None
@@ -69,7 +91,20 @@ class BaseTool:
         try:
             with open(cache_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # 檢查快取是否有效（可選：加入時間戳檢查）
+
+                # 檢查快取是否過期
+                if "cached_at" in data:
+                    try:
+                        cached_time = datetime.fromisoformat(data["cached_at"])
+                        expiration_time = cached_time + timedelta(days=self.cache_expiration_days)
+
+                        if datetime.now() > expiration_time:
+                            print(f"⚠️  快取已過期: {identifier} (已存在 {(datetime.now() - cached_time).days} 天)")
+                            return None
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️  無法解析快取時間: {e}")
+                        # 繼續使用快取，但不進行過期檢查
+
                 return data
         except (json.JSONDecodeError, IOError) as e:
             print(f"⚠️  無法載入快取 {cache_path}: {e}")
@@ -155,28 +190,50 @@ class BaseTool:
         """
         從 Claude 回應中提取 JSON
 
-        支援兩種格式：
+        支援多種格式：
         1. Markdown code block: ```json ... ```
-        2. 純 JSON
+        2. 多個 JSON code blocks（取最後一個）
+        3. 純 JSON
+        4. 使用 json-repair 修復不完整的 JSON
         """
-        # 嘗試提取 Markdown code block
-        if "```json" in response:
-            try:
-                json_start = response.find("```json") + 7
-                json_end = response.find("```", json_start)
-                if json_end == -1:
-                    json_end = len(response)
-                json_text = response[json_start:json_end].strip()
-            except Exception:
-                json_text = response.strip()
+        json_text = None
+
+        # 1. 嘗試提取所有 Markdown code blocks
+        json_blocks = re.findall(r'```json\s*(.*?)```', response, re.DOTALL)
+
+        if json_blocks:
+            # 使用最後一個 JSON block（通常最完整）
+            json_text = json_blocks[-1].strip()
         else:
+            # 2. 嘗試直接解析整個回應
             json_text = response.strip()
 
+        if not json_text:
+            print("⚠️  無法從回應中提取 JSON")
+            return None
+
+        # 3. 嘗試標準 JSON 解析
         try:
             return json.loads(json_text)
         except json.JSONDecodeError as e:
+            # 4. 使用 json-repair 嘗試修復
+            if JSON_REPAIR_AVAILABLE:
+                try:
+                    print(f"⚠️  標準 JSON 解析失敗，嘗試使用 json-repair 修復...")
+                    repaired = repair_json(json_text, return_objects=True)
+                    if isinstance(repaired, dict):
+                        print("✓ JSON 修復成功")
+                        return repaired
+                    else:
+                        print(f"⚠️  json-repair 返回非字典類型: {type(repaired)}")
+                        return None
+                except Exception as repair_error:
+                    print(f"⚠️  json-repair 修復失敗: {repair_error}")
+            else:
+                print("⚠️  json-repair 未安裝，無法修復 JSON")
+
             print(f"⚠️  JSON 解析失敗: {e}")
-            print(f"   原始回應前 200 字元: {response[:200]}...")
+            print(f"   原始 JSON 前 200 字元: {json_text[:200]}...")
             return None
 
     async def analyze_async(

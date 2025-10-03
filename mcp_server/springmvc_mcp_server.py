@@ -8,12 +8,12 @@ MCP (Model Context Protocol) Server for Claude Code integration
 Phase 2: Basic skeleton with tool registration infrastructure
 """
 
-import sys
-import json
 import asyncio
 import io
-from typing import Dict, Any, List, Callable
+import json
+import sys
 from pathlib import Path
+from typing import Any, Callable, Dict, List
 
 # Windows console encoding fix
 if sys.platform == 'win32':
@@ -62,16 +62,20 @@ class SpringMVCMCPServer:
             name="extract_oracle_schema",
             description="提取 Oracle 資料庫 Schema（Tables, Views, Sequences, Synonyms, Procedures, Oracle Jobs）",
             parameters={
-                "connection_name": {
-                    "type": "string",
-                    "description": "連線名稱（dev/test/prod），需要在 config/oracle_config.yaml 中定義",
-                    "required": True
+                "type": "object",
+                "properties": {
+                    "connection_name": {
+                        "type": "string",
+                        "description": "連線名稱（dev/test/prod），需要在 config/oracle_config.yaml 中定義",
+                        "enum": ["dev", "test", "prod"]
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "輸出檔案路徑",
+                        "default": "output/db_schema.json"
+                    }
                 },
-                "output_file": {
-                    "type": "string",
-                    "description": "輸出檔案路徑",
-                    "default": "output/db_schema.json"
-                }
+                "required": ["connection_name"]
             },
             handler=self._handle_extract_oracle_schema
         )
@@ -81,21 +85,23 @@ class SpringMVCMCPServer:
             name="analyze_stored_procedure",
             description="深度分析 Oracle Stored Procedure（8 維度分析：業務用途、觸發方式、風險評估等）",
             parameters={
-                "procedure_name": {
-                    "type": "string",
-                    "description": "Procedure 名稱",
-                    "required": False
+                "type": "object",
+                "properties": {
+                    "procedure_name": {
+                        "type": "string",
+                        "description": "Procedure 名稱"
+                    },
+                    "analyze_all": {
+                        "type": "boolean",
+                        "description": "是否分析所有 Procedure",
+                        "default": False
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "輸出檔案路徑（分析單個 Procedure 時使用）"
+                    }
                 },
-                "analyze_all": {
-                    "type": "boolean",
-                    "description": "是否分析所有 Procedure",
-                    "default": False
-                },
-                "output_file": {
-                    "type": "string",
-                    "description": "輸出檔案路徑（分析單個 Procedure 時使用）",
-                    "required": False
-                }
+                "required": []
             },
             handler=self._handle_analyze_procedure
         )
@@ -151,6 +157,14 @@ class SpringMVCMCPServer:
         """
         connection_name = kwargs.get("connection_name", "dev")
         output_file = kwargs.get("output_file", "output/db_schema.json")
+
+        # 參數驗證
+        valid_connections = ["dev", "test", "prod"]
+        if connection_name not in valid_connections:
+            return {
+                "success": False,
+                "error": f"無效的連線名稱: {connection_name}，必須是 {valid_connections} 之一"
+            }
 
         try:
             print(f"提取 Oracle Schema (連線: {connection_name})...", file=sys.stderr)
