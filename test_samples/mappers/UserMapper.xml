@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <!-- ResultMap for User -->
+    <resultMap id="UserResultMap" type="com.example.model.User">
+        <id column="id" property="id" javaType="Long"/>
+        <result column="username" property="username" javaType="String"/>
+        <result column="email" property="email" javaType="String"/>
+        <result column="status" property="status" javaType="String"/>
+        <result column="created_at" property="createdAt" javaType="java.util.Date"/>
+    </resultMap>
+
+    <!-- SQL Fragment: User columns -->
+    <sql id="userColumns">
+        id, username, email, status, created_at
+    </sql>
+
+    <!-- Select all users -->
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM users
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Select user by ID -->
+    <select id="selectById" resultMap="UserResultMap" parameterType="Long">
+        SELECT <include refid="userColumns"/>
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <!-- Select user by username -->
+    <select id="selectByUsername" resultMap="UserResultMap" parameterType="String">
+        SELECT <include refid="userColumns"/>
+        FROM users
+        WHERE username = #{username}
+    </select>
+
+    <!-- Insert user -->
+    <insert id="insert" parameterType="com.example.model.User">
+        INSERT INTO users (username, email, status, created_at)
+        VALUES (#{username}, #{email}, #{status}, SYSDATE)
+    </insert>
+
+    <!-- Update user -->
+    <update id="update" parameterType="com.example.model.User">
+        UPDATE users
+        SET username = #{username},
+            email = #{email},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete user by ID -->
+    <delete id="deleteById" parameterType="Long">
+        DELETE FROM users
+        WHERE id = #{id}
+    </delete>
+
+    <!-- Search users with dynamic SQL -->
+    <select id="search" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM users
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE '%' || #{username} || '%'
+            </if>
+            <if test="email != null and email != ''">
+                AND email LIKE '%' || #{email} || '%'
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>
