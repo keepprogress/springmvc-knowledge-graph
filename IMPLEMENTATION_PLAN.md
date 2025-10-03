@@ -96,69 +96,123 @@
 
 ---
 
-## Phase 3: 程式碼分析工具 📝
+## Phase 3: 程式碼結構提取 📝
 
-### 3.1 JSP 分析器
-- [ ] mcp_server/prompts/jsp_analysis.txt
-  - [ ] JSP include 關係分析
-  - [ ] AJAX 呼叫提取（$.ajax, fetch）
-  - [ ] Form submit 目標分析
-  - [ ] URL 路徑解析
-  - [ ] EL 表達式分析
+**策略**: 純結構化提取（Parsing），不使用 LLM
+**目的**: 建立 100% 準確的程式碼結構資料，作為知識圖譜基礎
+
+### 3.1 JSP 結構提取器
 - [ ] mcp_server/tools/jsp_analyzer.py
-  - [ ] 解析 JSP 檔案（lxml）
-  - [ ] 提取靜態 include 與動態 include
-  - [ ] 提取 JavaScript 中的 API 呼叫
-  - [ ] 建立 JSP 依賴圖
+  - [ ] **Include 關係**（lxml + BeautifulSoup）
+    - [ ] 靜態 include: `<%@ include file="..." %>`
+    - [ ] 動態 include: `<jsp:include page="..." />`
+    - [ ] JSTL import: `<c:import url="..." />`
+  - [ ] **Form 提取**（lxml）
+    - [ ] `<form action="..." method="...">` 解析
+    - [ ] Input fields（name, type, required）
+    - [ ] Submit target URL
+  - [ ] **AJAX 呼叫提取**（Regex）
+    - [ ] jQuery: `$.ajax()`, `$.get()`, `$.post()`
+    - [ ] Fetch API: `fetch("...")`
+    - [ ] XMLHttpRequest: `xhr.open()`
+  - [ ] **URL 提取**（Regex）
+    - [ ] href, src, location.href, window.open
+    - [ ] 分類: Controller URL / Static / External / JSP
+  - [ ] **EL 表達式提取**（Regex）
+    - [ ] `${...}` 標準 EL
+    - [ ] `#{...}` Spring EL
+    - [ ] 提取變數名稱與屬性鏈
+  - [ ] **Taglib 依賴**（lxml）
+    - [ ] `<%@ taglib prefix="..." uri="..." %>`
+  - [ ] **輸出**: `output/structure/jsp/<filename>.json`
 
-### 3.2 Controller 分析器
-- [ ] mcp_server/prompts/controller_analysis.txt
-  - [ ] @RequestMapping 路徑分析
-  - [ ] 請求方法（GET/POST/PUT/DELETE）
-  - [ ] 參數綁定分析（@RequestParam, @PathVariable, @RequestBody）
-  - [ ] @Autowired Service 依賴
-  - [ ] 回傳類型分析（View name, JSON, Redirect）
+### 3.2 Controller 結構提取器
 - [ ] mcp_server/tools/controller_analyzer.py
-  - [ ] 使用 javalang 解析 Java 檔案
-  - [ ] 提取註解與參數
-  - [ ] 分析方法呼叫鏈
+  - [ ] **註解提取**（javalang）
+    - [ ] `@Controller` / `@RestController`
+    - [ ] `@RequestMapping` (類別與方法層級)
+    - [ ] `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`
+    - [ ] HTTP method, URL path, params, headers
+  - [ ] **依賴注入**（javalang）
+    - [ ] `@Autowired` Service 依賴
+    - [ ] 建構子注入、欄位注入
+  - [ ] **方法呼叫鏈**（javalang AST）
+    - [ ] 追蹤 Service method 呼叫
+    - [ ] 提取方法名稱與參數
+  - [ ] **回傳類型分析**（javalang）
+    - [ ] View name (String)
+    - [ ] ModelAndView
+    - [ ] @ResponseBody (JSON)
+    - [ ] RedirectView
+  - [ ] **參數綁定**（javalang）
+    - [ ] `@RequestParam`, `@PathVariable`, `@RequestBody`
+    - [ ] Model attributes
+  - [ ] **輸出**: `output/structure/controllers/<classname>.json`
 
-### 3.3 Service 分析器
-- [ ] mcp_server/prompts/service_analysis.txt
-  - [ ] @Service 類別分析
-  - [ ] @Autowired Mapper 依賴
-  - [ ] 業務邏輯複雜度評估
-  - [ ] 事務管理（@Transactional）
-  - [ ] 異常處理分析
+### 3.3 Service 結構提取器
 - [ ] mcp_server/tools/service_analyzer.py
-  - [ ] 解析 Service 類別
-  - [ ] 追蹤 Mapper 方法呼叫
-  - [ ] 分析事務邊界
+  - [ ] **類別註解**（javalang）
+    - [ ] `@Service`, `@Component`
+    - [ ] `@Transactional` (類別層級)
+  - [ ] **依賴注入**（javalang）
+    - [ ] `@Autowired` Mapper 依賴
+    - [ ] 其他 Service 依賴
+  - [ ] **方法分析**（javalang AST）
+    - [ ] 方法簽名（名稱、參數、回傳型別）
+    - [ ] `@Transactional` (方法層級)
+    - [ ] Mapper method 呼叫追蹤
+  - [ ] **異常處理**（javalang AST）
+    - [ ] try-catch blocks
+    - [ ] throws declarations
+  - [ ] **輸出**: `output/structure/services/<classname>.json`
 
-### 3.4 MyBatis Mapper 分析器
-- [ ] mcp_server/prompts/mybatis_analysis.txt
-  - [ ] Mapper 介面與 XML 對應
-  - [ ] SQL 語句提取（select/insert/update/delete）
-  - [ ] CALLABLE 類型（Stored Procedure 呼叫）
-  - [ ] 動態 SQL 分析（if/choose/foreach）
-  - [ ] ResultMap 映射分析
+### 3.4 MyBatis Mapper 結構提取器
 - [ ] mcp_server/tools/mybatis_analyzer.py
-  - [ ] 解析 Mapper.xml（lxml）
-  - [ ] 解析 Mapper Interface（javalang）
-  - [ ] 提取 SQL 語句與參數
-  - [ ] 輸出 mybatis_analysis.json
+  - [ ] **Mapper Interface 解析**（javalang）
+    - [ ] `@Mapper` 註解
+    - [ ] 方法簽名（參數、回傳型別）
+    - [ ] `@Param` 參數註解
+  - [ ] **Mapper XML 解析**（lxml）
+    - [ ] `<select>`, `<insert>`, `<update>`, `<delete>`
+    - [ ] SQL 語句提取（包含動態 SQL）
+    - [ ] `<include>` 引用（SQL fragments）
+    - [ ] ResultMap 映射
+  - [ ] **SQL 類型偵測**（Regex）
+    - [ ] DML: SELECT, INSERT, UPDATE, DELETE
+    - [ ] CALLABLE: `{call procedure_name(...)}`
+    - [ ] 提取 Procedure 名稱
+  - [ ] **參數映射**（lxml + Regex）
+    - [ ] `#{paramName}` 參數佔位符
+    - [ ] 動態 SQL: `<if>`, `<choose>`, `<foreach>`
+  - [ ] **表名提取**（Regex + sqlparse）
+    - [ ] FROM, JOIN, INTO 後的表名
+    - [ ] 與 db_schema.json 比對驗證
+  - [ ] **輸出**: `output/structure/mappers/<interface_name>.json`
 
-### 3.5 SQL 分析器
-- [ ] mcp_server/prompts/sql_analysis.txt
-  - [ ] SQL 語句解析（SELECT/INSERT/UPDATE/DELETE）
-  - [ ] 表與欄位提取
-  - [ ] JOIN 關係分析
-  - [ ] WHERE 條件分析
-  - [ ] 效能風險評估（全表掃描、缺少索引等）
+### 3.5 SQL 結構分析器
 - [ ] mcp_server/tools/sql_analyzer.py
-  - [ ] 使用 sqlparse 或正則解析 SQL
-  - [ ] 提取表名與欄位名
-  - [ ] 與 db_schema.json 比對
+  - [ ] **SQL 解析**（sqlparse）
+    - [ ] 語句類型: SELECT/INSERT/UPDATE/DELETE
+    - [ ] 表名提取（FROM, JOIN, INTO）
+    - [ ] 欄位提取（SELECT list, WHERE clause）
+  - [ ] **JOIN 關係**（sqlparse AST）
+    - [ ] INNER JOIN, LEFT JOIN, RIGHT JOIN
+    - [ ] ON 條件分析
+  - [ ] **WHERE 條件**（Regex）
+    - [ ] 提取過濾欄位
+    - [ ] 參數佔位符
+  - [ ] **Schema 驗證**（比對 db_schema.json）
+    - [ ] 表是否存在
+    - [ ] 欄位是否存在
+    - [ ] 型別是否匹配
+  - [ ] **輸出**: 內嵌於 Mapper 分析結果
+
+**Phase 3 核心原則**:
+- ✅ 100% 準確（不依賴 LLM 推測）
+- ✅ 快速（無 API 呼叫，秒級完成）
+- ✅ 可測試（純 parsing 邏輯）
+- ✅ 可重複（結果一致）
+- ❌ 不做業務語意分析（留給 Phase 7）
 
 ---
 
@@ -290,27 +344,243 @@
 
 ## Phase 5: 知識圖譜構建 🕸️
 
-### 5.1 Graph Builder
-- [ ] mcp_server/tools/graph_builder.py
-  - [ ] 載入所有分析結果（JSP, Controller, Service, Mapper, SQL, DB Schema）
-  - [ ] 建立節點（JSP, AJAX_CALL, CONTROLLER, SERVICE, MAPPER, SQL, TABLE, PROCEDURE, VIEW, TRIGGER, ORACLE_JOB）
-  - [ ] 建立邊（INCLUDES, CALLS, INVOKES, USES, EXECUTES, QUERIES, TRIGGERED_BY, SCHEDULED_BY）
-  - [ ] 使用 NetworkX 建立有向圖
-  - [ ] 輸出 JSON 與 GraphML 格式
+**策略**: 混合雙層方案 = 程式碼建立確定關係 + LLM 完整性掃描補強
+**目的**: 兼顧準確性與完整性
 
-### 5.2 Graph Query
+### 5.1 Graph Builder - Layer 1（程式碼建立確定關係）
+
+- [ ] mcp_server/tools/graph_builder_code.py
+  - [ ] **資料載入**
+    - [ ] 載入 `output/structure/jsp/*.json`
+    - [ ] 載入 `output/structure/controllers/*.json`
+    - [ ] 載入 `output/structure/services/*.json`
+    - [ ] 載入 `output/structure/mappers/*.json`
+    - [ ] 載入 `output/db_schema.json`
+    - [ ] 載入 `output/analysis/procedures/*.json`（Phase 1）
+  - [ ] **節點建立**（NetworkX）
+    - [ ] JSP: `{type: "JSP", path: "...", name: "..."}`
+    - [ ] AJAX_CALL: `{type: "AJAX", url: "...", method: "GET/POST"}`
+    - [ ] CONTROLLER: `{type: "CONTROLLER", class: "...", method: "..."}`
+    - [ ] SERVICE: `{type: "SERVICE", class: "...", method: "..."}`
+    - [ ] MAPPER: `{type: "MAPPER", interface: "...", method: "..."}`
+    - [ ] SQL: `{type: "SQL", statement_type: "SELECT/INSERT/...", tables: [...]}`
+    - [ ] TABLE: `{type: "TABLE", name: "...", schema: "..."}`
+    - [ ] PROCEDURE: `{type: "PROCEDURE", name: "...", package: "..."}`
+    - [ ] VIEW: `{type: "VIEW", name: "..."}`
+    - [ ] TRIGGER: `{type: "TRIGGER", name: "...", table: "..."}`
+    - [ ] ORACLE_JOB: `{type: "ORACLE_JOB", name: "...", procedure: "..."}`
+  - [ ] **邊建立（高信心關係）**
+    - [ ] ✅ JSP → JSP: `INCLUDES` (明確路徑，confidence=1.0)
+    - [ ] ⚠️ JSP → CONTROLLER: `CALLS` (URL pattern matching，confidence=0.6-0.9)
+    - [ ] ✅ CONTROLLER → SERVICE: `INVOKES` (@Autowired 明確，confidence=1.0)
+    - [ ] ✅ SERVICE → MAPPER: `USES` (依賴注入明確，confidence=1.0)
+    - [ ] ✅ MAPPER → SQL: `EXECUTES` (XML 明確，confidence=1.0)
+    - [ ] ✅ SQL → TABLE: `QUERIES/MODIFIES` (sqlparse，confidence=0.8-1.0)
+    - [ ] ✅ SQL → PROCEDURE: `CALLS` (CALLABLE 明確，confidence=1.0)
+    - [ ] ✅ TRIGGER → PROCEDURE: `TRIGGERED_BY` (db_schema，confidence=1.0)
+    - [ ] ✅ ORACLE_JOB → PROCEDURE: `SCHEDULED_BY` (db_schema，confidence=1.0)
+  - [ ] **輸出**
+    - [ ] `output/graph/code_based_graph.json` (程式碼建立的關係)
+    - [ ] `output/graph/low_confidence_edges.json` (需 LLM 驗證的關係)
+
+### 5.2 Graph Builder - Layer 2（LLM 完整性掃描 + Parser 改進建議）
+
+- [ ] mcp_server/tools/graph_builder_llm.py
+  - [ ] **完整性掃描**
+    - [ ] 輸入: Phase 3 所有結構化資料 + Layer 1 圖譜
+    - [ ] LLM 任務: 掃描所有檔案，識別 Layer 1 可能遺漏的關係
+    - [ ] 重點關注:
+      - [ ] 動態 URL（EL 表達式、Context Path）
+      - [ ] 複雜 Form action（JavaScript 動態設定）
+      - [ ] 反射呼叫、動態代理
+      - [ ] 間接依賴（透過 Factory、Builder）
+  - [ ] **模糊關係推測**
+    - [ ] AJAX URL → Controller mapping
+      ```
+      輸入: {
+        "ajax_url": "${ctx}/user/detail/${userId}",
+        "controllers": [
+          {"path": "/user/detail/{id}", "method": "UserController.detail"},
+          {"path": "/admin/user/detail/{id}", "method": "AdminController.detail"}
+        ]
+      }
+      輸出: {
+        "most_likely": "UserController.detail",
+        "confidence": 0.85,
+        "reasoning": "URL pattern 與 context 匹配"
+      }
+      ```
+    - [ ] Form action 解析
+    - [ ] 間接方法呼叫鏈
+  - [ ] **遺漏偵測**
+    - [ ] 孤立節點檢查（應該有關係但沒有的節點）
+    - [ ] 對稱性檢查（A→B 存在，B→A 應該也存在？）
+    - [ ] 業務邏輯合理性（Controller 沒有 Service？）
+  - [ ] **⭐ Parser 問題偵測與改進建議**
+    - [ ] 發現 Parser 遺漏的 Pattern
+      ```python
+      # LLM 發現遺漏案例
+      {
+        "issue_type": "ajax_pattern_missed",
+        "file": "user/list.jsp",
+        "line": 45,
+        "missed_code": "$.post('${pageContext.request.contextPath}/user/save', data)",
+        "reason": "Parser regex 未處理 pageContext.request.contextPath",
+        "current_regex": r"\$\.post\(['\"]([^'\"]+)['\"]",
+        "suggested_regex": r"\$\.post\(['\"](?:\$\{[^}]+\})?([^'\"]+)['\"]",
+        "improvement": "支援 ${...} EL 表達式前綴",
+        "test_cases": [
+          "$.post('/user/save', data)",
+          "$.post('${ctx}/user/save', data)",
+          "$.post('${pageContext.request.contextPath}/user/save', data)"
+        ]
+      }
+      ```
+    - [ ] 分類問題類型
+      - [ ] `regex_too_strict`: Regex 過於嚴格，遺漏合法 pattern
+      - [ ] `encoding_issue`: 編碼問題（如 HTML entities）
+      - [ ] `multi_line_pattern`: 跨行 pattern 未處理
+      - [ ] `nested_structure`: 巢狀結構未解析
+      - [ ] `new_framework_syntax`: 新語法（如 Vue.js、React）
+    - [ ] 累積改進知識庫
+      ```
+      output/parser_improvements/
+        ├── ajax_patterns.json (AJAX 相關改進)
+        ├── el_expression_patterns.json (EL 表達式)
+        ├── form_patterns.json (Form action)
+        └── summary.md (改進總覽)
+      ```
+  - [ ] **輸出**
+    - [ ] `output/graph/llm_discovered_edges.json` (LLM 發現的關係)
+    - [ ] `output/graph/missing_relationships.json` (可能遺漏的關係)
+    - [ ] `output/parser_improvements/issues_found.json` (Parser 問題清單)
+    - [ ] `output/parser_improvements/regex_suggestions.json` (Regex 改進建議)
+
+### 5.3 Graph Merger（合併與驗證）
+
+- [ ] mcp_server/tools/graph_merger.py
+  - [ ] **關係合併**
+    - [ ] 合併 Layer 1 (code-based) + Layer 2 (LLM-discovered)
+    - [ ] 衝突解決策略:
+      - [ ] 程式碼 confidence=1.0 優先
+      - [ ] LLM 僅補充，不覆蓋明確關係
+      - [ ] 雙方都發現的關係 → 提高 confidence
+  - [ ] **雙向驗證**
+    - [ ] 程式碼發現但 LLM 認為不合理 → 標記為 `needs_review`
+    - [ ] LLM 發現但程式碼未找到 → 標記為 `llm_inferred`
+  - [ ] **信心評分**
+    ```json
+    {
+      "source": "user/list.jsp",
+      "target": "UserController.list",
+      "type": "CALLS",
+      "confidence": 0.95,
+      "source_methods": ["code_regex", "llm_verification"],
+      "evidence": {
+        "code": "$.ajax({url: '/user/list'})",
+        "llm_reasoning": "明確的 URL 匹配"
+      }
+    }
+    ```
+  - [ ] **圖譜輸出**（多種格式）
+    - [ ] `output/knowledge_graph.json` (完整圖譜，自訂格式)
+    - [ ] `output/knowledge_graph.graphml` (NetworkX 標準格式)
+    - [ ] `output/knowledge_graph_stats.json` (統計資訊)
+    - [ ] `output/neo4j_import.cypher` (Neo4j 匯入腳本)
+    - [ ] `output/graph_quality_report.md` (品質報告)
+
+### 5.4 Graph Query（查詢 API）
 - [ ] mcp_server/tools/graph_query.py
-  - [ ] 路徑查詢（最短路徑、所有路徑）
-  - [ ] 依賴分析（上游依賴、下游依賴）
-  - [ ] 影響範圍分析（修改某個節點會影響哪些節點）
-  - [ ] 孤立節點檢測（未被使用的程式碼）
-  - [ ] 循環依賴檢測
+  - [ ] **路徑查詢**（NetworkX algorithms）
+    - [ ] `find_path(source, target)` - 最短路徑
+    - [ ] `find_all_paths(source, target, max_depth=10)` - 所有路徑
+    - [ ] `trace_request_flow(jsp_or_url)` - 追蹤完整請求流程
+  - [ ] **依賴分析**
+    - [ ] `get_upstream_dependencies(node)` - 上游依賴（誰依賴我）
+    - [ ] `get_downstream_dependencies(node)` - 下游依賴（我依賴誰）
+    - [ ] `get_all_dependencies(node, depth=5)` - 遞迴依賴
+  - [ ] **影響範圍分析**
+    - [ ] `impact_analysis(node)` - 修改此節點會影響哪些節點
+    - [ ] `find_affected_jsps(table_name)` - 修改表會影響哪些 JSP
+  - [ ] **程式碼品質分析**
+    - [ ] `find_orphaned_nodes()` - 孤立節點（未被使用）
+    - [ ] `detect_circular_dependencies()` - 循環依賴
+    - [ ] `find_dead_code()` - 死程式碼
+  - [ ] **Procedure 相關查詢**
+    - [ ] `find_procedure_callers(proc_name)` - 誰調用此 Procedure
+    - [ ] `find_procedure_call_paths(proc_name)` - 所有調用路徑
+  - [ ] **信心度查詢**
+    - [ ] `get_low_confidence_edges(threshold=0.7)` - 低信心關係
+    - [ ] `get_llm_inferred_edges()` - LLM 推測的關係
+    - [ ] `get_needs_review_edges()` - 需人工檢視的關係
 
-### 5.3 Graph Visualization
+### 5.5 Graph Visualization
 - [ ] mcp_server/tools/graph_visualizer.py
-  - [ ] Mermaid 格式輸出
-  - [ ] GraphViz DOT 格式輸出
-  - [ ] HTML 互動式圖表（使用 vis.js 或 cytoscape.js）
+  - [ ] **Mermaid 輸出**
+    - [ ] Flowchart 格式（適合小範圍圖譜）
+    - [ ] 支援節點著色（by type）
+    - [ ] 支援邊標籤（關係類型）
+  - [ ] **GraphViz DOT 輸出**
+    - [ ] 適合大型圖譜
+    - [ ] 自動佈局演算法（dot, neato, fdp）
+  - [ ] **HTML 互動式圖表**
+    - [ ] 使用 vis.js 或 cytoscape.js
+    - [ ] 節點點擊顯示詳細資訊
+    - [ ] 篩選器（by type, by package）
+    - [ ] 搜尋功能
+  - [ ] **子圖提取**
+    - [ ] `extract_subgraph(center_node, radius=2)` - 局部圖譜
+    - [ ] `extract_flow_diagram(jsp_file)` - 單一 JSP 的完整流程圖
+
+### 5.6 Parser 持續改進循環 🔄
+
+- [ ] mcp_server/tools/parser_improver.py
+  - [ ] **自動應用建議**（可選）
+    - [ ] 讀取 `output/parser_improvements/regex_suggestions.json`
+    - [ ] 人工審核後，自動更新 Phase 3 parser 的 regex
+    - [ ] 回歸測試（確保舊 pattern 仍可用）
+  - [ ] **改進效果追蹤**
+    ```json
+    {
+      "iteration": 1,
+      "date": "2025-10-03",
+      "improvements_applied": 5,
+      "before": {
+        "total_edges": 1250,
+        "low_confidence_edges": 180
+      },
+      "after": {
+        "total_edges": 1320,
+        "low_confidence_edges": 95
+      },
+      "improvement_rate": "5.6% more edges, 47% fewer low-confidence"
+    }
+    ```
+  - [ ] **Parser 品質報告**
+    - [ ] 覆蓋率統計（多少 % 的關係被 parser 直接抓到）
+    - [ ] 信心度分布（high/medium/low 的比例）
+    - [ ] 常見遺漏 pattern 排行榜
+  - [ ] **Slash Command 支援**
+    ```
+    /improve-parsers
+      - 檢視 LLM 建議的 parser 改進
+      - 人工選擇要應用的改進
+      - 自動更新 regex 並測試
+
+    /parser-quality-report
+      - 產生 Parser 品質報告
+      - 顯示覆蓋率、信心度分布
+      - 列出待改進項目
+    ```
+
+**Phase 5 核心原則（混合雙層 + 持續改進）**:
+- ✅ **Layer 1（程式碼）**: 建立高信心關係（@Autowired, include, SQL）
+- ✅ **Layer 2（LLM）**: 完整性掃描，補充遺漏關係（動態 URL, EL 表達式）
+- ✅ **信心評分**: 每個關係附帶 confidence 與 evidence
+- ✅ **雙向驗證**: 程式碼 vs LLM 結果交叉驗證
+- 🔄 **持續改進**: LLM 發現 parser 問題 → 提供 regex 建議 → 人工審核 → 自動應用
+- ✅ **多格式輸出**: JSON, GraphML, Neo4j Cypher
+- ⚠️ **完整性優先**: 寧可低信心關係保留，也不要遺漏
 
 ---
 
@@ -358,23 +628,124 @@
 
 ---
 
-## Phase 7: 優化與擴展 🚀
+## Phase 7: 語意豐富化 🤖
 
-### 7.1 效能優化
-- [ ] 並行分析支援（asyncio）
-- [ ] 增量分析（只分析變更的檔案）
-- [ ] 快取策略優化
+**策略**: 基於 Phase 5 知識圖譜，使用 LLM 進行業務語意分析
+**前提**: Phase 3-5 已建立完整且準確的結構化知識圖譜
 
-### 7.2 進階功能
-- [ ] 安全性分析（SQL Injection 風險、XSS 風險）
-- [ ] 效能瓶頸偵測
-- [ ] 程式碼品質評分
-- [ ] 技術債務評估
+### 7.1 Trace-Based 語意分析
+- [ ] mcp_server/tools/semantic_analyzer.py
+  - [ ] **完整路徑追蹤**
+    - [ ] 輸入: 知識圖譜 + 特定路徑（JSP → Controller → Service → Mapper → SQL → Table）
+    - [ ] 輸出: LLM 分析此路徑的業務用途、安全性、效能風險
+  - [ ] **業務流程理解**
+    ```python
+    trace = graph_query.trace_request_flow("user/list.jsp")
+    # trace = [
+    #   JSP(user/list.jsp)
+    #   → AJAX(/api/users)
+    #   → Controller(UserController.getUsers)
+    #   → Service(UserService.listUsers)
+    #   → Mapper(UserMapper.selectUsers)
+    #   → SQL(SELECT * FROM users WHERE status = 1)
+    #   → Table(USERS)
+    # ]
 
-### 7.3 整合功能
+    semantic_analysis = semantic_analyzer.analyze_trace(trace)
+    # 輸出: {
+    #   "business_purpose": "使用者列表查詢功能",
+    #   "security_concerns": ["缺少權限檢查", "可能的 SQL injection"],
+    #   "performance_risks": ["全表掃描", "缺少分頁"],
+    #   "recommendations": [...]
+    # }
+    ```
+  - [ ] **Procedure 業務語意增強**
+    - [ ] 基於 Phase 1 的 Procedure 分析
+    - [ ] 結合知識圖譜中的調用路徑
+    - [ ] LLM 深度理解業務邏輯與潛在問題
+
+### 7.2 Prompt 模板（Phase 7 專用）
+- [ ] mcp_server/prompts/semantic_enrichment.txt
+  - [ ] 輸入: 完整 trace path + 程式碼片段
+  - [ ] 分析維度:
+    - [ ] 業務用途推測
+    - [ ] 安全性風險（XSS, SQL Injection, CSRF）
+    - [ ] 效能瓶頸（N+1 query, 全表掃描）
+    - [ ] 程式碼異味（過長方法、循環依賴）
+    - [ ] 重構建議
+- [ ] mcp_server/prompts/flow_analysis.txt
+  - [ ] 分析完整業務流程
+  - [ ] 識別關鍵業務邏輯
+  - [ ] 提供優化建議
+- [ ] mcp_server/prompts/security_audit.txt
+  - [ ] 安全性專項稽核
+  - [ ] 識別常見漏洞模式
+  - [ ] OWASP Top 10 檢查
+
+### 7.3 語意豐富化工具
+- [ ] **/enrich-semantic** Command
+  ```
+  /enrich-semantic <node_or_path>
+    - 對特定節點或路徑進行語意分析
+    - 例如: /enrich-semantic user/list.jsp
+    - 輸出: 業務理解 + 安全分析 + 效能建議
+  ```
+- [ ] **/audit-security** Command
+  ```
+  /audit-security [範圍]
+    - 全面安全性稽核
+    - 掃描 XSS, SQL Injection, CSRF 風險
+    - 輸出: 風險報告與修復建議
+  ```
+- [ ] **/suggest-refactoring** Command
+  ```
+  /suggest-refactoring <component>
+    - 基於語意分析提供重構建議
+    - 識別程式碼異味
+    - 提供具體重構步驟
+  ```
+- [ ] **/explain-flow** Command
+  ```
+  /explain-flow <start_point>
+    - 解釋完整業務流程
+    - 使用 LLM 生成自然語言說明
+    - 適合新人 onboarding
+  ```
+
+### 7.4 批次語意豐富化
+- [ ] mcp_server/tools/batch_semantic_enrichment.py
+  - [ ] 掃描整個知識圖譜
+  - [ ] 識別關鍵路徑（高頻使用、高風險）
+  - [ ] 批次進行語意分析
+  - [ ] 產生完整的語意豐富化報告
+  - [ ] 成本控制（僅分析關鍵路徑）
+
+### 7.5 效能優化（基於語意分析）
+- [ ] N+1 Query 偵測
+  - [ ] 分析 Service → Mapper 呼叫模式
+  - [ ] 識別迴圈中的重複查詢
+  - [ ] LLM 提供 JOIN 優化建議
+- [ ] 全表掃描偵測
+  - [ ] 分析 SQL WHERE 條件
+  - [ ] 比對 db_schema 的索引資訊
+  - [ ] LLM 建議索引策略
+- [ ] 事務邊界分析
+  - [ ] 分析 @Transactional 使用
+  - [ ] 識別過長事務
+  - [ ] LLM 建議拆分策略
+
+**Phase 7 核心原則**:
+- ✅ 建立在準確的知識圖譜之上
+- ✅ LLM 僅用於語意理解與建議
+- ✅ 結構化資訊（Phase 3-5）不被 LLM 修改
+- ✅ 可選功能（不影響核心分析）
+- ✅ 成本可控（僅分析關鍵路徑）
+
+### 7.6 整合功能（進階）
 - [ ] Git 整合（分析變更影響範圍）
-- [ ] JIRA 整合（追蹤需求與程式碼關聯）
+- [ ] 增量分析（只分析變更的檔案）
 - [ ] CI/CD 整合（自動化分析）
+- [ ] 並行分析支援（asyncio）
 
 ---
 
@@ -400,27 +771,93 @@
 
 ## 關鍵設計決策記錄
 
-### 1. 為何使用多 Agent 架構？
+### 1. ⭐ 為何採用 Parsing-First 策略？（Phase 3）
+
+**決策**: Phase 3 專注於結構化提取（Pure Parsing）
+
+**理由**:
+1. **可靠性**: 結構化資訊（URL、類別名、方法名）100% 準確，不受 LLM 幻覺影響
+2. **速度**: 解析 1000+ 檔案秒級完成，無需等待 API
+3. **成本**: 不消耗 Claude API quota
+4. **可測試性**: 純 parsing 邏輯易於單元測試
+5. **知識圖譜基礎**: 準確的結構化資料是圖譜的基石
+
+**實作原則**:
+- Phase 3: 使用 lxml, BeautifulSoup, javalang, sqlparse（純 parsing）
+- 輸出: 100% 準確的結構化 JSON
+
+### 2. ⭐ 為何採用混合雙層圖譜構建？（Phase 5）
+
+**決策**: Layer 1 (程式碼) + Layer 2 (LLM 完整性掃描) + 持續改進循環
+
+**問題**: 純程式碼建立圖譜的困境
+```python
+# Parser 難以處理的案例
+$.ajax({url: '${pageContext.request.contextPath}/user/save'})
+@RequestMapping("${api.base.path}/user")  # 配置檔路徑
+location.href = ctx + '/user/detail/' + userId  # 動態拼接
+```
+
+**解決方案**:
+```
+Layer 1 (程式碼): 建立明確關係
+  ├─ @Autowired 依賴 (confidence=1.0)
+  ├─ include 路徑 (confidence=1.0)
+  └─ 簡單 URL (confidence=0.8-1.0)
+
+Layer 2 (LLM): 完整性掃描
+  ├─ 模糊 URL mapping (confidence=0.6-0.9)
+  ├─ 發現遺漏關係
+  └─ ⭐ 提供 Parser 改進建議
+
+持續改進循環:
+  └─ LLM 建議 → 人工審核 → 更新 regex → 下次更準確
+```
+
+**優勢**:
+1. **完整性**: 不遺漏邊界情況（動態 URL、EL 表達式）
+2. **準確性**: 明確關係由程式碼保證
+3. **可追蹤**: 每個關係有 confidence 與 evidence
+4. **自我優化**: Parser 持續改進，越用越準
+
+**對比**:
+| 項目 | 純 Parsing | 純 LLM | 混合雙層 |
+|------|-----------|--------|----------|
+| 明確關係準確度 | 100% | ~90% | 100% |
+| 模糊關係完整度 | 60% | 95% | 95% |
+| 處理速度 | 秒級 | 分鐘級 | 分鐘級 |
+| API 成本 | $0 | $高 | $中 (僅掃描) |
+| 持續改進 | 難 | 無 | ✅ |
+
+### 3. 為何使用多 Agent 架構？
 - **模組化**: 每個分析器獨立，易於維護與擴展
 - **Context 管理**: 避免單一 Agent 超過 200k token 限制
 - **並行處理**: 多個分析器可並行執行
-- **Prompt 專精**: 每個 Agent 有專門的 Prompt，提高分析準確度
+- **專精分析**: Phase 7 每個 trace path 獨立分析
 
-### 2. 為何 DB 提取不使用 LLM？
+### 4. 為何 DB 提取不使用 LLM？
 - **安全性**: 密碼不經過 LLM
 - **準確性**: 直接查詢系統表，100% 準確
 - **效能**: 本地提取快速，不消耗 API Quota
 - **可靠性**: 不受 LLM 幻覺影響
+- **一致性**: 與 Parsing-First 策略一致
 
-### 3. 為何使用 MCP Protocol？
+### 5. 為何使用 MCP Protocol？
 - **Claude Code 原生支援**: 無縫整合
 - **Slash Commands**: 提供更好的 UX
 - **未來擴展**: 可整合其他 AI IDE（Copilot CLI 等）
 
-### 4. Procedure 分析的觸發方式偵測
-- **多來源檢測**: Triggers + Oracle Jobs + MyBatis CALLABLE
-- **信心程度**: 明確標註推測的信心（high/medium/low）
-- **上下文豐富**: 提供充足資訊給 LLM 推理
+### 6. Phase 1 Procedure 分析的特殊性
+**為何 Phase 1 使用 LLM？**
+- Procedure 程式碼複雜（PL/SQL），難以純 parsing 理解業務用途
+- 需要推測觸發方式（非結構化資訊）
+- 風險評估需要語意理解
+- 數量較少（通常數十個），成本可控
+
+**但仍保持安全性**:
+- Procedure source code 本地提取（不經過 LLM）
+- 僅分析結果經過 LLM
+- 密碼安全（環境變數）
 
 ---
 
@@ -428,12 +865,20 @@
 
 - [x] Phase 1: 基礎設施建設（100%） ✅ 2025-10-02
 - [x] Phase 2: MCP Server 骨架（100%） ✅ 2025-10-03
-- [ ] Phase 3: 程式碼分析工具（0%）
+- [ ] Phase 3: 程式碼結構提取（0%） - **Pure Parsing**
 - [ ] Phase 4: Slash Commands（0%）
-- [ ] Phase 5: 知識圖譜構建（0%）
+- [ ] Phase 5: 知識圖譜構建（0%） - **Hybrid Dual-Layer + 持續改進**
 - [ ] Phase 6: 文檔與測試（5%）
-- [ ] Phase 7: 優化與擴展（0%）
+- [ ] Phase 7: 語意豐富化（0%） - **Trace-Based LLM Analysis**
 
 **最新完成**: Phase 2 - MCP Server 骨架 + Code Review 改進
 
-**下一步**: Phase 3 - 程式碼分析工具（JSP → Controller → Service → MyBatis）
+**策略調整** (2025-10-03):
+- ✅ 採用 **Parsing-First** 策略（Phase 3）
+- ✅ 採用 **混合雙層** 圖譜構建（Phase 5）
+  - Layer 1: 程式碼建立明確關係（confidence=1.0）
+  - Layer 2: LLM 完整性掃描 + Parser 改進建議
+  - 🔄 持續改進循環（LLM 發現問題 → 提供 regex 建議 → 自動應用）
+- Phase 7: 基於 trace path 的語意豐富化
+
+**下一步**: Phase 3.1 - JSP 結構提取器（lxml + Regex parsing）
