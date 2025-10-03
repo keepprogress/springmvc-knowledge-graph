@@ -37,6 +37,7 @@ except ImportError:
     print("⚠️  tree-sitter not available. Install: pip install tree-sitter tree-sitter-java",
           file=sys.stderr)
 
+# Note: Windows UTF-8 encoding is handled in base_tool.py
 from mcp_server.tools.base_tool import BaseTool
 
 
