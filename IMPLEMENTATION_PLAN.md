@@ -547,13 +547,22 @@
       "improvements_applied": 5,
       "before": {
         "total_edges": 1250,
-        "low_confidence_edges": 180
+        "low_confidence_edges": 180,
+        "parser_coverage": 0.72
       },
       "after": {
         "total_edges": 1320,
-        "low_confidence_edges": 95
+        "low_confidence_edges": 95,
+        "parser_coverage": 0.89
       },
-      "improvement_rate": "5.6% more edges, 47% fewer low-confidence"
+      "improvement_rate": "5.6% more edges, 47% fewer low-confidence",
+      "parser_improvements": {
+        "ajax_patterns": {
+          "before_coverage": 0.72,
+          "after_coverage": 0.89,
+          "improvement": "+23.6%"
+        }
+      }
     }
     ```
   - [ ] **Parser 品質報告**
@@ -572,6 +581,169 @@
       - 顯示覆蓋率、信心度分布
       - 列出待改進項目
     ```
+
+### 5.6.1 安全機制與風險緩解 🛡️
+
+**Risk 1: LLM Regex Suggestions May Be Wrong**
+
+- [ ] **必要安全閘門（Mandatory Gates）**
+  - [ ] **人工審核必要性**
+    - [ ] 所有 regex 建議必須經過人工審核（no auto-apply without review）
+    - [ ] 審核介面顯示:
+      - [ ] 原始 regex vs 建議 regex（diff view）
+      - [ ] Test cases（before/after 比對）
+      - [ ] 遺漏案例（missed code examples）
+      - [ ] LLM reasoning
+    - [ ] 審核者可以:
+      - [ ] ✅ Accept（應用建議）
+      - [ ] ✏️ Edit（修改後應用）
+      - [ ] ❌ Reject（拒絕建議）
+      - [ ] 🔖 Defer（稍後處理）
+  - [ ] **回歸測試套件**
+    - [ ] 每個 parser 模組維護測試案例庫
+    - [ ] 應用 regex 改進前:
+      - [ ] 執行所有現有 test cases
+      - [ ] 新 regex 必須通過所有舊測試
+      - [ ] 新 test cases（LLM 建議）也要通過
+    - [ ] 失敗處理:
+      - [ ] 任何測試失敗 → 自動拒絕建議
+      - [ ] 記錄失敗原因到 `rejected_suggestions.json`
+  - [ ] **Rollback 機制**
+    - [ ] Git 自動 commit 每次 regex 更新
+    - [ ] 若發現問題，提供快速 rollback:
+      ```
+      /rollback-parser-change <parser_name> <iteration>
+        - 回滾到指定版本
+        - 自動執行測試確保穩定性
+        - 記錄 rollback 原因供 LLM 學習
+      ```
+    - [ ] Rollback 觸發條件:
+      - [ ] 新 regex 導致分析錯誤
+      - [ ] Coverage 下降超過 5%
+      - [ ] 產生大量誤報（false positives）
+  - [ ] **改進建議品質檢查**
+    - [ ] LLM 建議必須包含:
+      - [ ] ✅ `current_regex`（目前版本）
+      - [ ] ✅ `suggested_regex`（建議版本）
+      - [ ] ✅ `test_cases`（至少 3 個，包含 edge cases）
+      - [ ] ✅ `reasoning`（為何需要改進）
+      - [ ] ✅ `improvement`（預期改善）
+    - [ ] 缺少任何必要欄位 → 自動拒絕
+
+**Risk 2: Conflict Resolution Complexity**
+
+- [ ] **明確的衝突解決政策**
+  - [ ] **基本原則**（Code-First Policy）
+    - [ ] 程式碼 confidence=1.0 → **永遠優先**（不可覆蓋）
+    - [ ] 程式碼 confidence ≥ 0.8 → 除非 LLM 提供明確反證
+    - [ ] LLM 僅可:
+      - [ ] ✅ 補充新關係（程式碼未發現）
+      - [ ] ✅ 提高既有關係的 confidence（雙方都發現）
+      - [ ] ❌ 覆蓋程式碼已建立的明確關係
+  - [ ] **Confidence 閾值政策**
+    ```python
+    # 定義於 mcp_server/tools/graph_merger.py
+    CONFIDENCE_THRESHOLDS = {
+        "auto_include": 0.85,      # 自動加入圖譜
+        "human_review": 0.60,      # 標記為需人工檢視
+        "auto_reject": 0.40,       # 自動排除（太不確定）
+        "conflict_threshold": 0.30 # confidence 差異超過此值 → 人工審核
+    }
+    ```
+  - [ ] **衝突處理流程**
+    - [ ] **Type 1: 同一關係，不同 confidence**
+      ```python
+      code_edge = {"source": "A", "target": "B", "confidence": 1.0, "method": "code"}
+      llm_edge = {"source": "A", "target": "B", "confidence": 0.7, "method": "llm"}
+
+      # 結果: 取高 confidence（1.0），標註雙方都發現
+      merged = {"source": "A", "target": "B", "confidence": 1.0,
+                "methods": ["code", "llm_verified"]}
+      ```
+    - [ ] **Type 2: Code 發現但 LLM 認為錯誤**（罕見但需處理）
+      ```python
+      code_edge = {"source": "A", "target": "B", "confidence": 0.65}
+      llm_edge = {"source": "A", "target": "C", "confidence": 0.85,
+                  "note": "B 是錯誤 mapping，應為 C"}
+
+      # 策略: 標記為 needs_human_review
+      # confidence 差異 = 0.85 - 0.65 = 0.20 < 0.30 → 保留 code_edge
+      # 但記錄 LLM 異議到 review_queue
+      ```
+    - [ ] **Type 3: LLM 發現新關係**（最常見）
+      ```python
+      llm_edge = {"source": "X", "target": "Y", "confidence": 0.75}
+      # code 未發現此關係
+
+      # 0.75 >= 0.60 → 標記為 "llm_inferred"，加入圖譜
+      # 輸出時附帶 "needs_verification: true"
+      ```
+  - [ ] **人工審核佇列（Review Queue）**
+    - [ ] 自動收集需審核案例:
+      - [ ] Confidence 差異 > 0.30
+      - [ ] LLM 認為 code 錯誤
+      - [ ] 孤立節點（應該有關係但沒有）
+    - [ ] 審核介面:
+      ```
+      /review-conflicts
+        - 顯示所有衝突案例
+        - 提供 Evidence（code snippet + LLM reasoning）
+        - 人工決策: Accept Code / Accept LLM / Custom
+      ```
+    - [ ] 決策記錄:
+      - [ ] 所有人工決策記錄到 `conflict_resolutions.json`
+      - [ ] 作為 LLM future learning 的參考
+  - [ ] **衝突稽核記錄（Audit Trail）**
+    - [ ] 所有衝突與解決方案記錄到 `output/graph/conflict_log.json`
+    ```json
+    {
+      "conflict_id": "c001",
+      "timestamp": "2025-10-03T14:30:00",
+      "type": "confidence_mismatch",
+      "code_edge": {...},
+      "llm_edge": {...},
+      "resolution": "code_wins",
+      "reason": "code confidence=1.0 policy",
+      "reviewer": "auto|human_name"
+    }
+    ```
+    - [ ] 統計報告:
+      - [ ] 衝突總數 / 解決數 / 待審核數
+      - [ ] Code wins / LLM wins / Custom resolution 比例
+      - [ ] 最常見衝突類型
+
+**Safety Metrics Dashboard**
+
+- [ ] **監控指標** (`/parser-safety-metrics`)
+  ```json
+  {
+    "parser_improvements": {
+      "total_suggestions": 50,
+      "accepted": 30,
+      "rejected": 15,
+      "deferred": 5,
+      "rejection_rate": "30%"
+    },
+    "test_coverage": {
+      "total_test_cases": 250,
+      "passing": 248,
+      "failing": 2,
+      "coverage": "99.2%"
+    },
+    "conflict_resolution": {
+      "total_conflicts": 85,
+      "auto_resolved": 70,
+      "human_reviewed": 15,
+      "code_wins": 60,
+      "llm_wins": 10,
+      "custom": 15
+    },
+    "rollbacks": {
+      "total": 3,
+      "reasons": ["coverage_drop", "false_positives", "test_failures"]
+    }
+  }
+  ```
 
 **Phase 5 核心原則（混合雙層 + 持續改進）**:
 - ✅ **Layer 1（程式碼）**: 建立高信心關係（@Autowired, include, SQL）
