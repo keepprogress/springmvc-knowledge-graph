@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """自動配置 Claude Code 的 MCP Server"""
 
 import json
@@ -6,6 +7,12 @@ from pathlib import Path
 import shutil
 import sys
 import subprocess
+import io
+
+# Windows console encoding fix
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 def setup_claude_code():
     """配置 Claude Code settings.json"""
@@ -66,6 +73,7 @@ def test_connection(server_path):
         # 簡單測試：檢查檔案是否存在且可讀取
         if not server_path.exists():
             print(f"✗ MCP Server 檔案不存在: {server_path}")
+            print(f"   Phase 2 開發中，請等待實作完成")
             return False
 
         # 測試 Python 語法
@@ -77,6 +85,25 @@ def test_connection(server_path):
 
         if result.returncode == 0:
             print("✓ MCP Server 檔案語法正確")
+
+            # 嘗試執行 Server 測試
+            print("\n測試 MCP Server 執行...")
+            test_result = subprocess.run(
+                [sys.executable, str(server_path)],
+                capture_output=True,
+                timeout=3
+            )
+            if test_result.returncode == 0:
+                print("✓ MCP Server 可正常執行")
+                # 顯示 Server 輸出
+                if test_result.stderr:
+                    print("\nServer 輸出:")
+                    for line in test_result.stderr.decode().split('\n')[:10]:
+                        if line.strip():
+                            print(f"  {line}")
+            else:
+                print(f"⚠️  MCP Server 執行返回非 0: {test_result.returncode}")
+
         else:
             print("✗ MCP Server 檔案有語法錯誤")
             print(result.stderr.decode())
