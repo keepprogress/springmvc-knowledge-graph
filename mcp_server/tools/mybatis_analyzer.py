@@ -391,26 +391,41 @@ class MyBatisAnalyzer(BaseTool):
         """
         Extract table names from SQL
 
-        Expected Coverage: ~70% (basic pattern matching)
-        Phase 5 LLM will handle complex queries with subqueries, CTEs, etc.
+        Expected Coverage: ~75% (improved pattern matching)
+
+        Supported Patterns:
+        - Simple table names: FROM users, JOIN orders
+        - Schema-qualified: FROM schema.users → extracts "users"
+        - Table aliases: FROM users u, FROM users AS u
+        - Multiple joins: LEFT JOIN, INNER JOIN, etc.
+
+        Known Limitations (deferred to Phase 5 LLM):
+        - Subqueries: FROM (SELECT ...) subquery
+        - Common Table Expressions (CTEs): WITH cte AS (...)
+        - Dynamic table names: FROM ${tableName}
+        - Complex expressions: FROM table1, table2 WHERE ...
+
+        Phase 5 LLM will handle complex queries with full semantic understanding.
         """
         sql_text = self._extract_sql_text(elem)
         tables = set()
 
-        # Pattern 1: FROM table_name
-        from_matches = re.findall(r'\bFROM\s+(\w+)', sql_text, re.IGNORECASE)
+        # Pattern 1: FROM table_name (with optional schema and alias)
+        # Matches: FROM users, FROM schema.users, FROM users u, FROM users AS u
+        from_matches = re.findall(r'\bFROM\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
         tables.update(from_matches)
 
-        # Pattern 2: JOIN table_name
-        join_matches = re.findall(r'\bJOIN\s+(\w+)', sql_text, re.IGNORECASE)
+        # Pattern 2: JOIN table_name (all JOIN types)
+        # Matches: JOIN, LEFT JOIN, INNER JOIN, etc.
+        join_matches = re.findall(r'\b(?:LEFT|RIGHT|INNER|OUTER|CROSS)?\s*JOIN\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
         tables.update(join_matches)
 
-        # Pattern 3: INTO table_name
-        into_matches = re.findall(r'\bINTO\s+(\w+)', sql_text, re.IGNORECASE)
+        # Pattern 3: INTO table_name (INSERT statements)
+        into_matches = re.findall(r'\bINTO\s+(?:[\w]+\.)?([\w]+)', sql_text, re.IGNORECASE)
         tables.update(into_matches)
 
         # Pattern 4: UPDATE table_name
-        update_matches = re.findall(r'\bUPDATE\s+(\w+)', sql_text, re.IGNORECASE)
+        update_matches = re.findall(r'\bUPDATE\s+(?:[\w]+\.)?([\w]+)', sql_text, re.IGNORECASE)
         tables.update(update_matches)
 
         return sorted(list(tables))
@@ -458,13 +473,19 @@ class MyBatisAnalyzer(BaseTool):
         return result_maps
 
     def _extract_sql_fragments(self, root) -> List[Dict[str, Any]]:
-        """Extract reusable SQL fragments (<sql>)"""
+        """
+        Extract reusable SQL fragments (<sql>)
+
+        Tracks fragment dependencies for knowledge graph construction.
+        Enables detection of nested fragments (fragment including another fragment).
+        """
         fragments = []
 
         for sql_elem in root.findall(".//sql"):
             fragment = {
                 "id": sql_elem.get("id", ""),
-                "sql": self._extract_sql_text(sql_elem)
+                "sql": self._extract_sql_text(sql_elem),
+                "includes": self._extract_includes(sql_elem)  # Track nested includes
             }
             fragments.append(fragment)
 
