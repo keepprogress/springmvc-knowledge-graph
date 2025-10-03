@@ -11,12 +11,21 @@ click>=8.0
 # JSON 解析與修復
 json-repair>=0.30.0
 
-# Java/XML 解析
-javalang>=0.13.0
-lxml>=4.9.0
+# ⭐ Java 解析（研究報告建議：tree-sitter-java 取代 javalang）
+# 優勢：錯誤恢復、增量解析、C-based 效能、Spring MVC 生產驗證
+tree-sitter>=0.20.0
+tree-sitter-java>=0.20.2
 
-# 圖譜處理
+# XML/HTML 解析
+lxml>=4.9.0
+beautifulsoup4>=4.12.0  # JSP parsing (研究報告建議)
+
+# SQL 解析
+sqlparse>=0.4.0  # MyBatis SQL 解析
+
+# 圖譜處理與視覺化
 networkx>=3.0
+pyvis>=0.3.0  # ⭐ 互動式 HTML 視覺化（研究報告推薦）
 
 # CLI 美化
 rich>=13.0

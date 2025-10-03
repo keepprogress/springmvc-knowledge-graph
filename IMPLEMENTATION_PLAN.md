@@ -8,6 +8,68 @@
 
 ---
 
+## Phase 0: 驗證策略 🧪 (新增 - 研究報告建議)
+
+**目的**: 漸進式驗證，降低大規模部署風險
+
+### 0.1 小規模驗證（10K LOC）
+- [ ] **選擇代表性子集**
+  - [ ] 選擇 1-2 個核心業務模組（User Management, Order Processing 等）
+  - [ ] 包含完整的 JSP → Controller → Service → Mapper → DB 路徑
+  - [ ] ~50 個 JSP, ~20 個 Controller, ~10 個 Service, ~15 個 Mapper
+- [ ] **驗證圖譜準確性**
+  - [ ] 人工檢查 20% 的關係（隨機抽樣）
+  - [ ] 驗證 JSP static include namespace 正確性
+  - [ ] 驗證 Controller @RequestMapping 與 URL 對應
+  - [ ] 驗證 Service → Mapper 依賴注入正確性
+- [ ] **調整 Parser 與 Prompt**
+  - [ ] 識別 parser 遺漏的 pattern
+  - [ ] 優化 tree-sitter-java query patterns
+  - [ ] 調整 LLM prompt 提高準確度
+- [ ] **預期結果**
+  - [ ] Parser 覆蓋率 ≥ 70%
+  - [ ] 關係準確率 ≥ 90%
+  - [ ] 分析時間: ~2 分鐘
+  - [ ] API 成本: ~$5
+
+### 0.2 中規模測試（100K LOC）
+- [ ] **擴展到多個模組**
+  - [ ] 包含 5-10 個業務模組
+  - [ ] ~500 個 JSP, ~200 個 Controller, ~150 個 Service
+- [ ] **驗證效能與成本**
+  - [ ] 測量分析時間是否線性擴展
+  - [ ] 驗證 API 成本預測模型
+  - [ ] 測試快取效果（semantic caching hit rate）
+- [ ] **測試階層式模型**
+  - [ ] 使用 Claude Haiku screening + Sonnet verification
+  - [ ] 驗證成本降低 (預期 5-10x)
+- [ ] **預期結果**
+  - [ ] 分析時間: ~15 分鐘
+  - [ ] API 成本: ~$30-40
+  - [ ] Cache hit rate: 60-70%
+
+### 0.3 全規模部署（500K+ LOC）
+- [ ] **完整專案分析**
+  - [ ] 所有 JSP, Controller, Service, Mapper
+  - [ ] 完整知識圖譜建構
+- [ ] **產生最終報告**
+  - [ ] 互動式 HTML 圖譜（PyVis）
+  - [ ] GraphML/GEXF 匯出（for Gephi）
+  - [ ] 品質報告（覆蓋率、信心度分布）
+- [ ] **預期結果** (based on research)
+  - [ ] 分析時間: 15-25 分鐘
+  - [ ] API 成本: $50-75
+  - [ ] 圖譜節點: 2,000-3,000
+  - [ ] 關係邊: 10,000-15,000
+
+**驗證成功標準**:
+- ✅ Parser 覆蓋率 ≥ 75%（Phase 0.1 優化後）
+- ✅ 關係準確率 ≥ 85%（人工抽樣驗證）
+- ✅ LLM 成本可控（<$100 for 500K LOC）
+- ✅ 分析時間可接受（<30 分鐘 for 500K LOC）
+
+---
+
 ## Phase 1: 基礎設施建設 ✅
 
 ### 1.1 專案結構 ✅
@@ -107,6 +169,15 @@
     - [ ] 靜態 include: `<%@ include file="..." %>`
     - [ ] 動態 include: `<jsp:include page="..." />`
     - [ ] JSTL import: `<c:import url="..." />`
+  - [ ] **⭐ Compilation Unit 建模**（新增 - 基於研究報告）
+    - [ ] 區分靜態 vs 動態 include:
+      - [ ] 靜態: 建立 `shared_namespace` (translation-time merge)
+      - [ ] 動態: 建立 `isolated_scope` (runtime execution)
+    - [ ] 追蹤函數解析順序（parent → first include → subsequent includes）
+    - [ ] 解析 `web.xml` 的 `jsp-property-group`:
+      - [ ] `<include-prelude>`: 所有 JSP 前置隱式 include
+      - [ ] `<include-coda>`: 所有 JSP 後置隱式 include
+    - [ ] 輸出 `compilation_unit_id` 給每個 JSP 節點
   - [ ] **Form 提取**（lxml）
     - [ ] `<form action="..." method="...">` 解析
     - [ ] Input fields（name, type, required）
@@ -122,69 +193,98 @@
     - [ ] `${...}` 標準 EL
     - [ ] `#{...}` Spring EL
     - [ ] 提取變數名稱與屬性鏈
+  - [ ] **Java Scriptlet 提取**（Regex + tree-sitter-java）
+    - [ ] 提取 `<% ... %>` 程式碼區塊
+    - [ ] 提取 `<%= ... %>` 表達式
+    - [ ] 使用 tree-sitter-java 解析提取的 Java code
   - [ ] **Taglib 依賴**（lxml）
     - [ ] `<%@ taglib prefix="..." uri="..." %>`
   - [ ] **輸出**: `output/structure/jsp/<filename>.json`
+    ```json
+    {
+      "file": "user/list.jsp",
+      "compilation_unit_id": "cu_user_list_001",
+      "static_includes": [...],
+      "dynamic_includes": [...],
+      "shared_namespace": ["header.jsp", "utils.jsp"],
+      "web_xml_implicit_includes": {
+        "prelude": ["config.jsp"],
+        "coda": ["footer.jsp"]
+      }
+    }
+    ```
 
 ### 3.2 Controller 結構提取器
 - [ ] mcp_server/tools/controller_analyzer.py
-  - [ ] **註解提取**（javalang）
+  - [ ] **⭐ 使用 tree-sitter-java**（取代 javalang - 研究報告建議）
+    - [ ] 優勢: 錯誤恢復能力、增量解析、C-based 效能、Spring MVC 生產驗證
+    - [ ] 使用 tree-sitter query language 提取註解與結構
+  - [ ] **註解提取**（tree-sitter-java queries）
     - [ ] `@Controller` / `@RestController`
     - [ ] `@RequestMapping` (類別與方法層級)
     - [ ] `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`
     - [ ] HTTP method, URL path, params, headers
-  - [ ] **依賴注入**（javalang）
+    - [ ] Query pattern: `(annotation (identifier) @name (annotation_argument_list) @args)`
+  - [ ] **依賴注入**（tree-sitter-java queries）
     - [ ] `@Autowired` Service 依賴
     - [ ] 建構子注入、欄位注入
-  - [ ] **方法呼叫鏈**（javalang AST）
+    - [ ] Query pattern: `(field_declaration (modifiers (annotation)) (variable_declarator))`
+  - [ ] **方法呼叫鏈**（tree-sitter-java CST）
     - [ ] 追蹤 Service method 呼叫
     - [ ] 提取方法名稱與參數
-  - [ ] **回傳類型分析**（javalang）
+    - [ ] Query pattern: `(method_invocation (identifier) @method (argument_list) @args)`
+  - [ ] **回傳類型分析**（tree-sitter-java）
     - [ ] View name (String)
     - [ ] ModelAndView
     - [ ] @ResponseBody (JSON)
     - [ ] RedirectView
-  - [ ] **參數綁定**（javalang）
+  - [ ] **參數綁定**（tree-sitter-java）
     - [ ] `@RequestParam`, `@PathVariable`, `@RequestBody`
     - [ ] Model attributes
+  - [ ] **錯誤恢復**（tree-sitter-java 特性）
+    - [ ] 處理不完整的 Java 檔案（編譯中、錯誤程式碼）
+    - [ ] 標記 parsing errors 但仍提取可用資訊
   - [ ] **輸出**: `output/structure/controllers/<classname>.json`
 
 ### 3.3 Service 結構提取器
 - [ ] mcp_server/tools/service_analyzer.py
-  - [ ] **類別註解**（javalang）
+  - [ ] **⭐ 使用 tree-sitter-java**（取代 javalang）
+  - [ ] **類別註解**（tree-sitter-java queries）
     - [ ] `@Service`, `@Component`
     - [ ] `@Transactional` (類別層級)
-  - [ ] **依賴注入**（javalang）
+  - [ ] **依賴注入**（tree-sitter-java queries）
     - [ ] `@Autowired` Mapper 依賴
     - [ ] 其他 Service 依賴
-  - [ ] **方法分析**（javalang AST）
+  - [ ] **方法分析**（tree-sitter-java CST）
     - [ ] 方法簽名（名稱、參數、回傳型別）
     - [ ] `@Transactional` (方法層級)
     - [ ] Mapper method 呼叫追蹤
-  - [ ] **異常處理**（javalang AST）
+  - [ ] **異常處理**（tree-sitter-java CST）
     - [ ] try-catch blocks
     - [ ] throws declarations
+    - [ ] Query pattern: `(try_statement (catch_clause (catch_formal_parameter)))`
   - [ ] **輸出**: `output/structure/services/<classname>.json`
 
 ### 3.4 MyBatis Mapper 結構提取器
 - [ ] mcp_server/tools/mybatis_analyzer.py
-  - [ ] **Mapper Interface 解析**（javalang）
+  - [ ] **Mapper Interface 解析**（tree-sitter-java）
     - [ ] `@Mapper` 註解
     - [ ] 方法簽名（參數、回傳型別）
     - [ ] `@Param` 參數註解
+    - [ ] Query pattern: `(interface_declaration (annotation) @mapper_ann (interface_body))`
   - [ ] **Mapper XML 解析**（lxml）
     - [ ] `<select>`, `<insert>`, `<update>`, `<delete>`
     - [ ] SQL 語句提取（包含動態 SQL）
     - [ ] `<include>` 引用（SQL fragments）
     - [ ] ResultMap 映射
-  - [ ] **SQL 類型偵測**（Regex）
+  - [ ] **SQL 類型偵測**（sqlparse）
     - [ ] DML: SELECT, INSERT, UPDATE, DELETE
     - [ ] CALLABLE: `{call procedure_name(...)}`
     - [ ] 提取 Procedure 名稱
   - [ ] **參數映射**（lxml + Regex）
     - [ ] `#{paramName}` 參數佔位符
     - [ ] 動態 SQL: `<if>`, `<choose>`, `<foreach>`
-  - [ ] **表名提取**（Regex + sqlparse）
+  - [ ] **表名提取**（sqlparse + Regex fallback）
     - [ ] FROM, JOIN, INTO 後的表名
     - [ ] 與 db_schema.json 比對驗證
   - [ ] **輸出**: `output/structure/mappers/<interface_name>.json`
@@ -386,6 +486,61 @@
 ### 5.2 Graph Builder - Layer 2（LLM 完整性掃描 + Parser 改進建議）
 
 - [ ] mcp_server/tools/graph_builder_llm.py
+  - [ ] **⭐ RAG (Retrieval-Augmented Generation) 實作**（研究報告驗證）
+    - [ ] 架構: Static analysis results → inject into LLM prompts → contextual reasoning
+    - [ ] 優勢: 70% top-2 accuracy (研究報告數據)
+    - [ ] vs Data-Augmented Training (需 fine-tuning，成本高)
+  - [ ] **⭐ Prompt Engineering 最佳實踐**（研究報告建議）
+    - [ ] **Context Window**: ±15 行程式碼（sweet spot）
+      - [ ] 太少: 準確度下降
+      - [ ] 太多: noise 增加但無益
+    - [ ] **XML-Structured Prompts**: 15-20% 準確度提升
+      ```xml
+      <task>找出 AJAX URL 對應的 Controller</task>
+      <context>
+        <ajax_call>
+          <file>user/list.jsp:45</file>
+          <code>$.post('${ctx}/user/save', data)</code>
+        </ajax_call>
+        <candidate_controllers>
+          <controller>
+            <class>UserController</class>
+            <method>saveUser</method>
+            <mapping>@PostMapping("/user/save")</mapping>
+          </controller>
+        </candidate_controllers>
+      </context>
+      <requirements>
+        - 輸出 JSON 格式
+        - 包含 confidence (0.0-1.0)
+        - 提供 reasoning
+      </requirements>
+      ```
+    - [ ] **Few-Shot Examples**: 3-5 個涵蓋 positive/negative/edge cases
+    - [ ] **Step-by-Step Reasoning**: 要求 LLM 先推理再結論（提升 15-20%）
+  - [ ] **⭐ Semantic Caching 策略**（研究報告: 3-5x 成本降低）
+    - [ ] **Normalization**:
+      ```python
+      def semantic_hash(code, query_type):
+          # Remove whitespace, comments, formatting
+          normalized = normalize_code(code)
+          # Hash normalized code + query type
+          return hash(normalized + query_type)
+      ```
+    - [ ] **Cache Structure**:
+      ```json
+      {
+        "cache_key": "hash_abc123_url_mapping",
+        "input": {"code": "...", "query": "..."},
+        "output": {"target": "UserController.save", "confidence": 0.9},
+        "timestamp": "2025-10-03T10:00:00",
+        "hit_count": 15
+      }
+      ```
+    - [ ] **Expected Performance**:
+      - [ ] Cache hit rate: 60-80% (研究數據)
+      - [ ] Cost reduction: 3-5x
+      - [ ] 應用於增量分析時效果更顯著
   - [ ] **完整性掃描**
     - [ ] 輸入: Phase 3 所有結構化資料 + Layer 1 圖譜
     - [ ] LLM 任務: 掃描所有檔案，識別 Layer 1 可能遺漏的關係
@@ -516,21 +671,61 @@
 
 ### 5.5 Graph Visualization
 - [ ] mcp_server/tools/graph_visualizer.py
+  - [ ] **⭐ PyVis 互動式視覺化**（研究報告推薦 - CLI 工具最佳選擇）
+    - [ ] **優勢**（來自研究）:
+      - [ ] Wraps vis.js (physics-based layouts)
+      - [ ] Zero JavaScript knowledge required
+      - [ ] Generates shareable HTML for stakeholders
+      - [ ] 適合 CLI 工具（不需額外 server）
+    - [ ] **功能實作**:
+      ```python
+      from pyvis.network import Network
+
+      def generate_pyvis(graph):
+          net = Network(height="800px", width="100%", directed=True)
+          net.from_nx(graph)  # Load from NetworkX
+
+          # Physics layout (spring-based)
+          net.show_buttons(filter_=['physics'])
+
+          # Node customization
+          for node in graph.nodes():
+              net.get_node(node)['color'] = get_color_by_type(node)
+              net.get_node(node)['title'] = get_node_details(node)
+
+          # Generate interactive HTML
+          net.show('output/graph_interactive.html')
+      ```
+    - [ ] **節點著色**（by type）:
+      - [ ] JSP: 藍色
+      - [ ] CONTROLLER: 綠色
+      - [ ] SERVICE: 黃色
+      - [ ] MAPPER: 橙色
+      - [ ] TABLE/PROCEDURE: 紅色
+    - [ ] **互動功能**:
+      - [ ] 拖曳節點（physics engine）
+      - [ ] 點擊節點顯示詳細資訊（hover tooltip）
+      - [ ] 篩選器（by type, by confidence）
+      - [ ] 搜尋功能（highlight matching nodes）
+      - [ ] 縮放與平移
+    - [ ] **輸出**: `output/graph_interactive.html` (可直接開啟分享)
   - [ ] **Mermaid 輸出**
-    - [ ] Flowchart 格式（適合小範圍圖譜）
+    - [ ] Flowchart 格式（適合文件嵌入）
     - [ ] 支援節點著色（by type）
     - [ ] 支援邊標籤（關係類型）
+    - [ ] 輸出: `output/graph_mermaid.md`
   - [ ] **GraphViz DOT 輸出**
-    - [ ] 適合大型圖譜
-    - [ ] 自動佈局演算法（dot, neato, fdp）
-  - [ ] **HTML 互動式圖表**
-    - [ ] 使用 vis.js 或 cytoscape.js
-    - [ ] 節點點擊顯示詳細資訊
-    - [ ] 篩選器（by type, by package）
-    - [ ] 搜尋功能
+    - [ ] 適合大型圖譜（專業佈局演算法）
+    - [ ] 自動佈局演算法（dot, neato, fdp, circo）
+    - [ ] 輸出: `output/graph.dot`
+  - [ ] **⭐ GEXF Export**（研究報告: Gephi 最佳支援）
+    - [ ] GEXF format for Gephi visualization
+    - [ ] 保留所有節點屬性（confidence, evidence）
+    - [ ] 輸出: `output/knowledge_graph.gexf`
   - [ ] **子圖提取**
     - [ ] `extract_subgraph(center_node, radius=2)` - 局部圖譜
     - [ ] `extract_flow_diagram(jsp_file)` - 單一 JSP 的完整流程圖
+    - [ ] 使用 PyVis 渲染子圖
 
 ### 5.6 Parser 持續改進循環 🔄
 
@@ -745,14 +940,115 @@
   }
   ```
 
+### 5.7 成本與效能模型 📊 (新增 - 研究報告驗證)
+
+**目的**: 基於研究數據提供可預測的成本與時間估算
+
+- [ ] **效能基準**（500K LOC Spring MVC 專案）
+  ```yaml
+  分析時間: 15-25 分鐘
+  API 成本: $50-75
+  圖譜規模:
+    節點數: 2,000-3,000
+    關係邊: 10,000-15,000
+    信心度分布:
+      high (>0.85): 70%
+      medium (0.60-0.85): 20%
+      low (<0.60): 10%
+  ```
+
+- [ ] **⭐ 階層式模型使用**（研究報告: 10x 成本降低）
+  - [ ] **Claude Haiku** (Screening Layer):
+    - [ ] 成本: $0.25/M input tokens, $1.25/M output tokens
+    - [ ] 用途: 初步篩選、簡單 URL mapping、明顯 false positives
+    - [ ] 涵蓋: 90% 的 LLM 呼叫
+  - [ ] **Claude Sonnet** (Verification Layer):
+    - [ ] 成本: $3/M input tokens, $15/M output tokens
+    - [ ] 用途: 複雜推理、高風險決策、最終驗證
+    - [ ] 涵蓋: 10% 的 LLM 呼叫
+  - [ ] **成本對比**:
+    ```
+    全部使用 Sonnet: $300 (500K LOC)
+    階層式模型: $50-75 (10x 降低)
+    ```
+
+- [ ] **成本控制策略**（研究報告驗證）
+  - [ ] **Progressive Disclosure**:
+    ```
+    1. Static analysis (free): Filter 90% of code
+    2. Heuristic pre-filtering (free): Eliminate 90% of remaining
+    3. Haiku screening (cheap): Process 90% of ambiguous cases
+    4. Sonnet verification (expensive): Final 0.1% high-priority
+    ```
+  - [ ] **Semantic Caching**: 60-80% hit rate
+    - [ ] 首次分析: $75
+    - [ ] 增量分析 (20% changed): $15-20 (5x 降低)
+  - [ ] **Batch Processing**: Group similar queries
+    - [ ] 單獨查詢 100 cases: 100 API calls
+    - [ ] Batch 查詢: 10 API calls (10x 降低)
+
+- [ ] **效能優化**
+  - [ ] **並行處理**: asyncio multi-threading
+    ```python
+    # Phase 3 parsing: 全並行（無 API 限制）
+    # Phase 5 LLM: Rate-limited 並行（Claude API limits）
+    async with asyncio.Semaphore(10):  # 10 concurrent LLM calls
+        tasks = [analyze_ambiguous_case(case) for case in cases]
+        results = await asyncio.gather(*tasks)
+    ```
+  - [ ] **Incremental Analysis**: Git diff-based
+    ```
+    全量分析: 25 分鐘, $75
+    增量分析 (10% changed): 3 分鐘, $10
+    ```
+
+- [ ] **成本預測公式**（基於研究）
+  ```python
+  def estimate_cost(loc, changed_ratio=1.0):
+      # Static analysis: free
+      static_time = loc / 50000  # minutes (1M LOC = 20 min)
+
+      # LLM analysis
+      ambiguous_cases = loc * 0.05 * changed_ratio  # 5% needs LLM
+      haiku_calls = ambiguous_cases * 0.9  # 90% Haiku
+      sonnet_calls = ambiguous_cases * 0.1  # 10% Sonnet
+
+      cache_hit_rate = 0.7 if changed_ratio < 1.0 else 0.0
+      effective_calls = (haiku_calls + sonnet_calls) * (1 - cache_hit_rate)
+
+      haiku_cost = (effective_calls * 0.9) * 0.001  # $1/1K calls
+      sonnet_cost = (effective_calls * 0.1) * 0.01  # $10/1K calls
+
+      total_cost = haiku_cost + sonnet_cost
+      total_time = static_time + (effective_calls / 100)  # 100 calls/min
+
+      return {
+          "total_time_minutes": total_time,
+          "total_cost_usd": total_cost,
+          "breakdown": {
+              "static_analysis": {"time": static_time, "cost": 0},
+              "llm_analysis": {
+                  "haiku_calls": effective_calls * 0.9,
+                  "sonnet_calls": effective_calls * 0.1,
+                  "cost": total_cost
+              }
+          }
+      }
+  ```
+
+- [ ] **Slash Command**: `/estimate-cost <loc> [--changed-ratio 0.1]`
+  - [ ] 輸出成本與時間預估
+  - [ ] 建議使用階層式模型 or 純 parsing（based on budget）
+
 **Phase 5 核心原則（混合雙層 + 持續改進）**:
 - ✅ **Layer 1（程式碼）**: 建立高信心關係（@Autowired, include, SQL）
 - ✅ **Layer 2（LLM）**: 完整性掃描，補充遺漏關係（動態 URL, EL 表達式）
 - ✅ **信心評分**: 每個關係附帶 confidence 與 evidence
 - ✅ **雙向驗證**: 程式碼 vs LLM 結果交叉驗證
 - 🔄 **持續改進**: LLM 發現 parser 問題 → 提供 regex 建議 → 人工審核 → 自動應用
-- ✅ **多格式輸出**: JSON, GraphML, Neo4j Cypher
+- ✅ **多格式輸出**: JSON, GraphML, GEXF, Neo4j Cypher, PyVis HTML
 - ⚠️ **完整性優先**: 寧可低信心關係保留，也不要遺漏
+- 💰 **成本可控**: 階層式模型 + Semantic caching = $50-75 for 500K LOC
 
 ---
 
@@ -913,11 +1209,132 @@
 - ✅ 可選功能（不影響核心分析）
 - ✅ 成本可控（僅分析關鍵路徑）
 
-### 7.6 整合功能（進階）
-- [ ] Git 整合（分析變更影響範圍）
-- [ ] 增量分析（只分析變更的檔案）
-- [ ] CI/CD 整合（自動化分析）
-- [ ] 並行分析支援（asyncio）
+### 7.6 增量分析（Incremental Analysis）⚡ (新增 - 研究報告建議)
+
+**目的**: 只處理變更檔案，提升日常使用效率 95%
+
+- [ ] **Git 整合**
+  - [ ] **檔案變更偵測**:
+    ```python
+    def detect_changes(base_commit="HEAD~1"):
+        # Get changed files from git diff
+        changed_files = git.diff(base_commit, name_only=True)
+
+        return {
+            "modified": [f for f in changed_files if f.endswith(('.java', '.jsp', '.xml'))],
+            "added": git.diff(base_commit, diff_filter='A'),
+            "deleted": git.diff(base_commit, diff_filter='D')
+        }
+    ```
+  - [ ] **影響範圍分析**:
+    - [ ] 變更 JSP → 重新分析該 JSP + 更新圖譜
+    - [ ] 變更 Controller → 重新分析 Controller + 更新關聯 Service
+    - [ ] 變更 Service → 更新下游 Mapper 關係
+    - [ ] 變更 Mapper XML → 重新解析 SQL + 更新 Table 關係
+
+- [ ] **增量圖譜更新**
+  - [ ] **節點更新策略**:
+    ```python
+    def incremental_update(graph, changed_files):
+        for file in changed_files['modified']:
+            # Remove old nodes from this file
+            old_nodes = graph.nodes_from_file(file)
+            graph.remove_nodes(old_nodes)
+
+            # Re-analyze file
+            new_structure = parse_file(file)
+            new_nodes = create_nodes(new_structure)
+            graph.add_nodes(new_nodes)
+
+            # Update edges
+            affected_edges = graph.edges_involving(old_nodes)
+            graph.remove_edges(affected_edges)
+            rebuild_edges(graph, new_nodes)
+    ```
+  - [ ] **快取重用**:
+    - [ ] Semantic cache hits: 70-80% (未變更檔案的 LLM 分析結果)
+    - [ ] Parser results cache: 100% (未變更檔案跳過 parsing)
+
+- [ ] **效能對比**（研究報告數據）
+  ```yaml
+  全量分析（500K LOC）:
+    時間: 25 分鐘
+    成本: $75
+    涵蓋: 100% 檔案
+
+  增量分析（10% 變更）:
+    時間: 3 分鐘 (95% faster)
+    成本: $10 (87% cheaper)
+    涵蓋: 10% 檔案 + 受影響節點
+  ```
+
+- [ ] **CI/CD 整合**
+  - [ ] **Pre-commit Hook**:
+    ```bash
+    # .git/hooks/pre-commit
+    python -m springmvc_analyzer --incremental --changed-only
+
+    # 檢查新增的安全風險
+    if [ $? -ne 0 ]; then
+        echo "❌ 發現新的安全風險，請修復"
+        exit 1
+    fi
+    ```
+  - [ ] **Pull Request 分析**:
+    ```yaml
+    # .github/workflows/analyze-pr.yml
+    name: Code Analysis
+    on: [pull_request]
+    jobs:
+      analyze:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Incremental Analysis
+            run: |
+              python -m springmvc_analyzer \
+                --incremental \
+                --base-commit ${{ github.event.pull_request.base.sha }} \
+                --output pr_analysis.html
+
+          - name: Comment PR
+            uses: actions/github-script@v6
+            with:
+              script: |
+                // Post analysis results as PR comment
+    ```
+
+- [ ] **Slash Commands**
+  ```
+  /analyze-changes [--since HEAD~1]
+    - 分析 git diff 中的變更
+    - 增量更新知識圖譜
+    - 輸出變更影響範圍報告
+
+  /impact-analysis <file_path>
+    - 顯示修改此檔案會影響哪些節點
+    - 列出所有上游與下游依賴
+  ```
+
+- [ ] **並行分析支援**（asyncio）
+  ```python
+  async def analyze_incremental(changed_files):
+      # Phase 3: Parallel parsing (no API limits)
+      parse_tasks = [parse_file_async(f) for f in changed_files]
+      structures = await asyncio.gather(*parse_tasks)
+
+      # Phase 5: Rate-limited LLM calls
+      async with asyncio.Semaphore(10):
+          llm_tasks = [analyze_ambiguous_async(s) for s in structures]
+          results = await asyncio.gather(*llm_tasks)
+
+      return merge_results(structures, results)
+  ```
+
+**增量分析核心原則**:
+- ✅ **快速回饋**: 3 分鐘內完成（vs 25 分鐘全量）
+- ✅ **成本可控**: $10 vs $75（87% 降低）
+- ✅ **準確性**: 與全量分析相同（基於同樣的 parser + LLM）
+- ✅ **CI/CD 友好**: 自動化整合，每次 commit/PR 都分析
 
 ---
 
