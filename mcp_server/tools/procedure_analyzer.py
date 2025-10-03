@@ -73,14 +73,25 @@ class ProcedureAnalyzer:
 
     def _find_oracle_jobs(self, procedure_name: str) -> List[Dict[str, Any]]:
         """
-        查找 Oracle Scheduler Jobs（需要從 db_schema 中提取）
+        查找調用此 Procedure 的 Oracle Scheduler Jobs
 
-        注意：此功能需要在 db_extractor.py 中加入 Job 提取
-        目前返回空列表，需要後續實作
+        從 db_schema.json 的 oracle_jobs 欄位中查找
         """
-        # TODO: 實作 Oracle Job 查詢
-        # 需要查詢: user_scheduler_jobs, user_jobs
-        return []
+        jobs = []
+
+        for job in self.db_schema.get("oracle_jobs", []):
+            # 檢查 Job 是否調用此 Procedure
+            calls_procedure = job.get("calls_procedure")
+            if calls_procedure and calls_procedure.upper() == procedure_name.upper():
+                jobs.append({
+                    "name": job["name"],
+                    "type": job["type"],
+                    "job_action": job.get("job_action", ""),
+                    "enabled": job.get("enabled", job.get("broken") is not True),
+                    "repeat_interval": job.get("repeat_interval") or job.get("interval")
+                })
+
+        return jobs
 
     def _find_mybatis_callers(self, procedure_name: str) -> List[Dict[str, Any]]:
         """
@@ -117,12 +128,12 @@ class ProcedureAnalyzer:
         載入已知的 Batch Jobs
 
         可以從：
-        1. Java 專案掃描結果
+        1. Java 專案掃描結果（Phase 3 實作）
         2. 配置檔
         3. 文檔
+
+        目前返回空列表，將在 Phase 3 實作 Java 專案掃描後完成
         """
-        # TODO: 實作 Batch Job 資訊載入
-        # 目前返回空列表
         return []
 
     def analyze_procedure(
@@ -172,6 +183,13 @@ class ProcedureAnalyzer:
 
         known_callers_str = "\n".join(known_callers) if known_callers else "尚未發現調用者"
 
+        # 處理 source_code 長度
+        source_code = proc_info.get("source_code", "")
+        max_source_length = 10000
+        if len(source_code) > max_source_length:
+            print(f"⚠️  警告: {procedure_name} 程式碼過長 ({len(source_code)} 字元)，已截斷至 {max_source_length} 字元")
+            source_code = source_code[:max_source_length] + "\n\n... (程式碼已截斷)"
+
         # 填充 Prompt 模板
         prompt = self.prompt_template.format(
             procedure_name=proc_info["name"],
@@ -181,7 +199,7 @@ class ProcedureAnalyzer:
             created=proc_info.get("created") or "未知",
             last_modified=proc_info.get("last_modified") or "未知",
             parameters=params_str,
-            source_code=proc_info.get("source_code", "")[:5000],  # 限制長度
+            source_code=source_code,
             dependent_tables=", ".join(proc_info.get("dependencies", {}).get("tables", [])) or "無",
             dependent_views=", ".join(proc_info.get("dependencies", {}).get("views", [])) or "無",
             dependent_sequences=", ".join(proc_info.get("dependencies", {}).get("sequences", [])) or "無",
@@ -196,37 +214,63 @@ class ProcedureAnalyzer:
         # 使用 Claude Agent SDK 分析
         print(f"分析 Procedure: {procedure_name}...")
 
-        options = ClaudeAgentOptions(
-            system_prompt="你是 Oracle Stored Procedure 分析專家",
-            max_turns=1,
-            allowed_tools=[]  # 純分析，不需要工具
-        )
+        try:
+            options = ClaudeAgentOptions(
+                system_prompt="你是 Oracle Stored Procedure 分析專家",
+                max_turns=1,
+                allowed_tools=[]  # 純分析，不需要工具
+            )
 
-        analysis_result = None
+            analysis_result = None
 
-        async def run_analysis():
-            nonlocal analysis_result
-            async for message in query(prompt=prompt, options=options):
-                if hasattr(message, 'content'):
-                    for block in message.content:
-                        if hasattr(block, 'text'):
-                            # 嘗試解析 JSON
-                            text = block.text
-                            # 提取 JSON（可能包含在 markdown 中）
-                            if "```json" in text:
-                                json_start = text.find("```json") + 7
-                                json_end = text.find("```", json_start)
-                                json_text = text[json_start:json_end].strip()
-                            else:
-                                json_text = text
+            async def run_analysis():
+                nonlocal analysis_result
+                try:
+                    async for message in query(prompt=prompt, options=options):
+                        if hasattr(message, 'content'):
+                            for block in message.content:
+                                if hasattr(block, 'text'):
+                                    # 嘗試解析 JSON
+                                    text = block.text
+                                    # 提取 JSON（可能包含在 markdown 中）
+                                    if "```json" in text:
+                                        json_start = text.find("```json") + 7
+                                        json_end = text.find("```", json_start)
+                                        json_text = text[json_start:json_end].strip()
+                                    else:
+                                        json_text = text
 
-                            try:
-                                analysis_result = json.loads(json_text)
-                            except json.JSONDecodeError:
-                                analysis_result = {"raw_response": text}
+                                    try:
+                                        analysis_result = json.loads(json_text)
+                                    except json.JSONDecodeError as e:
+                                        print(f"⚠️  JSON 解析失敗: {e}")
+                                        analysis_result = {
+                                            "status": "partial_success",
+                                            "error": f"JSON 解析失敗: {str(e)}",
+                                            "raw_response": text[:1000]  # 只保留前 1000 字元
+                                        }
+                except Exception as e:
+                    print(f"✗ Claude API 調用失敗: {e}")
+                    analysis_result = {
+                        "status": "error",
+                        "error": f"Claude API 調用失敗: {str(e)}"
+                    }
 
-        import asyncio
-        asyncio.run(run_analysis())
+            import asyncio
+            asyncio.run(run_analysis())
+
+            if analysis_result is None:
+                return {
+                    "status": "error",
+                    "error": "Claude 未返回任何回應"
+                }
+
+        except Exception as e:
+            print(f"✗ 分析過程發生錯誤: {e}")
+            return {
+                "status": "error",
+                "error": f"分析過程發生錯誤: {str(e)}"
+            }
 
         # 儲存結果
         if output_file:

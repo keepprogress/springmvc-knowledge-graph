@@ -19,7 +19,7 @@ networkx>=3.0
 rich>=13.0
 
 # 資料庫連線（用於 Schema 提取）
-pymysql>=1.0.0
+oracledb>=2.0.0
 
 # 開發工具（可選）
 pytest>=7.0.0

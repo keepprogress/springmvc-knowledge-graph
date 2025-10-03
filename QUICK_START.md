@@ -102,11 +102,12 @@ Prompts 位於 `mcp_server/prompts/`：
 
 ```bash
 mcp_server/prompts/
-├── jsp_analysis.txt
-├── controller_analysis.txt
-├── service_analysis.txt
-├── mybatis_analysis.txt
-└── sql_analysis.txt
+├── procedure_analysis.txt  ✅ 已實作
+├── jsp_analysis.txt        (Phase 3)
+├── controller_analysis.txt (Phase 3)
+├── service_analysis.txt    (Phase 3)
+├── mybatis_analysis.txt    (Phase 3)
+└── sql_analysis.txt        (Phase 3)
 ```
 
 **修改後**：
@@ -114,7 +115,7 @@ mcp_server/prompts/
 2. 重啟 Claude Code（會自動重新載入 MCP Server）
 3. 測試修改效果
 
-詳見 [PROMPTS_GUIDE.md](PROMPTS_GUIDE.md)
+詳見 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) 了解開發進度
 
 ---
 
@@ -171,10 +172,10 @@ python scripts/setup_claude.py
 
 ## 📚 下一步
 
-- 閱讀 [README.md](README.md) 了解完整功能
-- 閱讀 [PROMPTS_GUIDE.md](PROMPTS_GUIDE.md) 學習調整 Prompts
-- 閱讀 [ARCHITECTURE.md](ARCHITECTURE.md) 了解架構設計
-- 查看 [examples/](examples/) 中的範例程式碼
+- 閱讀 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) 了解完整開發計畫
+- 閱讀 [CLAUDE.md](CLAUDE.md) 了解架構設計與開發指引
+- 查看 `mcp_server/prompts/procedure_analysis.txt` 了解 Prompt 設計
+- 查看 `mcp_server/tools/` 中的已實作工具
 
 ---
 

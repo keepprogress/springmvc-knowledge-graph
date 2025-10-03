@@ -41,11 +41,12 @@ setup(
         ],
     },
 
-    entry_points={
-        "console_scripts": [
-            "springmvc-analyzer=cli.springmvc_cli:main",
-        ],
-    },
+    # CLI entry points will be added in Phase 6.4
+    # entry_points={
+    #     "console_scripts": [
+    #         "springmvc-analyzer=cli.springmvc_cli:main",
+    #     ],
+    # },
 
     classifiers=[
         "Development Status :: 3 - Alpha",
