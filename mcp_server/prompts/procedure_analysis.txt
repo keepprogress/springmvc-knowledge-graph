@@ -1,0 +1,322 @@
+你是 Oracle Stored Procedure 分析專家，專門評估 Procedure 的業務用途、風險與優化建議。
+
+## 分析任務
+
+請深入分析以下 Stored Procedure，提供完整的評估報告。
+
+### Procedure 資訊
+
+**名稱**: {procedure_name}
+**類型**: {procedure_type}  (PROCEDURE/FUNCTION)
+**所屬 Package**: {package_name}
+**狀態**: {status}
+**建立時間**: {created}
+**最後修改**: {last_modified}
+
+**參數**:
+{parameters}
+
+**原始碼**:
+```sql
+{source_code}
+```
+
+**依賴的資料庫物件**:
+- 表 (Tables): {dependent_tables}
+- 視圖 (Views): {dependent_views}
+- 序列 (Sequences): {dependent_sequences}
+- 其他 Procedure: {dependent_procedures}
+
+**已知的調用關係**:
+{known_callers}
+
+---
+
+## 分析維度（請逐項回答）
+
+### 1. 業務用途分析
+
+請推斷此 Procedure 的業務用途，包含：
+- **主要功能描述**（1-2 句話概括）
+- **業務場景**（如：用戶註冊、訂單結算、資料同步、報表生成等）
+- **執行頻率推測**（高頻/中頻/低頻/一次性）
+- **資料量級推測**（單筆/批次/大量資料）
+
+**輸出格式**:
+```json
+{
+  "business_purpose": "簡短描述",
+  "business_scenario": "具體場景",
+  "estimated_frequency": "high/medium/low/one-time",
+  "data_volume": "single/batch/bulk"
+}
+```
+
+---
+
+### 2. 操作類型分類
+
+請分析此 Procedure 的操作類型：
+
+**主要操作**: (單選)
+- DATA_MAINTENANCE: 資料維護（INSERT/UPDATE/DELETE 單筆或少量）
+- BATCH_PROCESSING: 批次處理（大量資料的 LOOP/CURSOR 操作）
+- DATA_SYNC: 資料同步（跨表或跨系統資料複製）
+- REPORT_GENERATION: 報表生成（複雜查詢與彙總）
+- DATA_CLEANUP: 資料清理（刪除過期資料）
+- BUSINESS_CALCULATION: 業務計算（財務結算、統計等）
+- AUDIT_LOG: 稽核日誌
+- OTHER: 其他（請說明）
+
+**輸出格式**:
+```json
+{
+  "operation_type": "類型",
+  "operation_details": "詳細說明此 Procedure 做了什麼操作"
+}
+```
+
+---
+
+### 3. 影響範圍分析
+
+**影響的表**（從程式碼分析）:
+
+對每個表，請標註操作類型：
+- READ: 僅讀取
+- INSERT: 新增資料
+- UPDATE: 更新資料
+- DELETE: 刪除資料
+- TRUNCATE: 清空表
+
+**輸出格式**:
+```json
+{
+  "affected_tables": [
+    {
+      "table_name": "USERS",
+      "operations": ["READ", "UPDATE"],
+      "estimated_rows": "推測影響的資料筆數（少量/中等/大量/全表）"
+    }
+  ]
+}
+```
+
+---
+
+### 4. 觸發方式分析（重要！）
+
+請根據以下線索推斷此 Procedure 的觸發方式：
+
+#### 線索 A: Trigger 自動觸發
+- 檢查是否有 Trigger 調用此 Procedure
+- Trigger 資訊: {trigger_info}
+
+#### 線索 B: Oracle 排程觸發
+- 檢查 Oracle DBMS_SCHEDULER/DBMS_JOB 是否有排程
+- Job 資訊: {oracle_jobs}
+
+#### 線索 C: Java BatchJob 調用
+- 檢查 MyBatis Mapper 是否有 statementType="CALLABLE"
+- MyBatis 調用資訊: {mybatis_callers}
+
+#### 線索 D: 手動調用
+- 無自動觸發機制，可能是管理員手動執行或臨時腳本
+
+**輸出格式**:
+```json
+{
+  "trigger_method": "ORACLE_TRIGGER / ORACLE_SCHEDULER / JAVA_BATCH_JOB / MANUAL / UNKNOWN",
+  "trigger_details": {
+    "oracle_trigger": "Trigger 名稱（如有）",
+    "oracle_job": "Job 名稱（如有）",
+    "java_batch_job": "BatchJob 類別名稱（如有）",
+    "mybatis_mapper": "Mapper 方法（如有）"
+  },
+  "confidence": "high/medium/low（推測的信心程度）",
+  "reasoning": "推斷理由"
+}
+```
+
+---
+
+### 5. 異常處理與事務評估
+
+**異常處理**:
+- 檢查程式碼中是否有 `EXCEPTION` 區塊
+- 是否有適當的錯誤處理（記錄日誌、回傳錯誤碼）
+- 是否會靜默失敗（吞掉錯誤）
+
+**事務管理**:
+- 是否有明確的 `COMMIT` 或 `ROLLBACK`
+- 是否依賴外部事務管理（由調用端控制）
+- 是否有 AUTONOMOUS_TRANSACTION（獨立事務）
+
+**輸出格式**:
+```json
+{
+  "exception_handling": {
+    "has_exception_block": true/false,
+    "handles_errors_properly": true/false,
+    "logs_errors": true/false,
+    "risk_level": "low/medium/high",
+    "issues": ["具體問題列表"]
+  },
+  "transaction_management": {
+    "has_explicit_commit": true/false,
+    "has_rollback": true/false,
+    "is_autonomous": true/false,
+    "transaction_scope": "internal/external/mixed",
+    "risk_level": "low/medium/high",
+    "issues": ["具體問題列表"]
+  }
+}
+```
+
+---
+
+### 6. 與現有 Batch Job 的衝突分析
+
+**已知的 Batch Jobs**:
+{existing_batch_jobs}
+
+請分析此 Procedure 是否可能與現有 Batch Jobs 發生衝突：
+
+**潛在衝突類型**:
+1. **資料競爭**: 同時修改相同表的相同資料
+2. **鎖定衝突**: 長時間持有表鎖或行鎖
+3. **資源競爭**: 同時處理大量資料，影響資料庫效能
+4. **邏輯衝突**: 業務邏輯上不應同時執行（如月結與日報）
+
+**Debug 困難度**:
+- 是否有充分的日誌記錄
+- 錯誤訊息是否明確
+- 是否易於重現問題
+
+**輸出格式**:
+```json
+{
+  "conflicts": [
+    {
+      "batch_job": "BatchJob 名稱",
+      "conflict_type": "data_race/lock/resource/logic",
+      "severity": "high/medium/low",
+      "description": "衝突描述",
+      "affected_tables": ["衝突的表"]
+    }
+  ],
+  "debug_difficulty": {
+    "level": "easy/medium/hard",
+    "has_logging": true/false,
+    "error_messages_clear": true/false,
+    "reproducible": "easy/hard",
+    "issues": ["Debug 困難點"]
+  }
+}
+```
+
+---
+
+### 7. Batch Job 整合建議
+
+**整合可行性評估**:
+
+請評估是否應該將此 Procedure：
+- **選項 A**: 併入現有 Batch Job
+- **選項 B**: 建立新的獨立 Batch Job
+- **選項 C**: 保持現狀（不建議改動）
+- **選項 D**: 重構為 Java 程式碼
+
+**輸出格式**:
+```json
+{
+  "recommendation": "A/B/C/D",
+  "integration_options": [
+    {
+      "option": "A/B/C/D",
+      "description": "方案描述",
+      "difficulty": "easy/medium/hard",
+      "estimated_effort": "天數或人天",
+      "pros": ["優點列表"],
+      "cons": ["缺點列表"],
+      "prerequisites": ["前置條件"]
+    }
+  ],
+  "preferred_option": {
+    "option": "推薦選項",
+    "reasoning": "推薦理由",
+    "implementation_steps": [
+      "步驟 1",
+      "步驟 2"
+    ]
+  }
+}
+```
+
+**整合難易度考量因素**:
+1. 程式碼複雜度（簡單/中等/複雜）
+2. 依賴關係（獨立/少量依賴/複雜依賴）
+3. 業務邏輯清晰度（清晰/模糊）
+4. 測試覆蓋度（是否有既有測試）
+5. 資料遷移需求（無/少量/大量）
+
+---
+
+### 8. 風險評估與優化建議
+
+**風險評估**:
+```json
+{
+  "risks": [
+    {
+      "category": "performance/data_integrity/security/maintainability",
+      "severity": "critical/high/medium/low",
+      "description": "風險描述",
+      "impact": "影響範圍",
+      "mitigation": "緩解建議"
+    }
+  ],
+  "overall_risk_level": "critical/high/medium/low"
+}
+```
+
+**優化建議**:
+```json
+{
+  "optimizations": [
+    {
+      "priority": "high/medium/low",
+      "category": "performance/code_quality/error_handling/logging",
+      "suggestion": "具體建議",
+      "expected_benefit": "預期效益"
+    }
+  ]
+}
+```
+
+---
+
+## 最終輸出
+
+請將以上所有分析結果整合為一個完整的 JSON 物件，格式如下：
+
+```json
+{
+  "procedure_name": "...",
+  "analysis_date": "ISO 8601 日期",
+  "business_analysis": { ... },
+  "operation_analysis": { ... },
+  "impact_analysis": { ... },
+  "trigger_analysis": { ... },
+  "quality_assessment": { ... },
+  "conflict_analysis": { ... },
+  "integration_recommendation": { ... },
+  "risk_assessment": { ... }
+}
+```
+
+**注意**:
+1. 所有推測必須基於程式碼與提供的資訊
+2. 明確標註推測的信心程度（high/medium/low）
+3. 提供具體的理由與證據
+4. 建議必須可執行，避免空泛的建議

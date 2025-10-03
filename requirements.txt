@@ -1,0 +1,26 @@
+# Claude Agent SDK
+claude-agent-sdk>=0.1.0
+
+# MCP Server
+mcp>=1.0.0
+
+# 配置與資料處理
+pyyaml>=6.0
+click>=8.0
+
+# Java/XML 解析
+javalang>=0.13.0
+lxml>=4.9.0
+
+# 圖譜處理
+networkx>=3.0
+
+# CLI 美化
+rich>=13.0
+
+# 資料庫連線（用於 Schema 提取）
+pymysql>=1.0.0
+
+# 開發工具（可選）
+pytest>=7.0.0
+black>=23.0.0

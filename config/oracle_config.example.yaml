@@ -1,0 +1,34 @@
+# Oracle 資料庫連線配置範例
+#
+# 使用方式：
+# 1. 複製此檔案為 oracle_config.yaml
+# 2. 填寫實際的連線資訊（不含密碼）
+# 3. 密碼透過環境變數提供：
+#    - Windows: $env:ORACLE_DEV_PASSWORD="your_password"
+#    - Linux/Mac: export ORACLE_DEV_PASSWORD="your_password"
+#
+# 注意：oracle_config.yaml 已加入 .gitignore，不會被提交
+
+connections:
+  # 開發環境
+  dev:
+    user: "scott"
+    dsn: "localhost:1521/ORCL"
+    description: "本地開發資料庫"
+
+  # 測試環境
+  test:
+    user: "test_user"
+    dsn: "test-db.company.com:1521/TESTDB"
+    description: "測試環境資料庫"
+
+  # 正式環境（謹慎使用）
+  prod:
+    user: "app_user"
+    dsn: "prod-db.company.com:1521/PRODDB"
+    description: "正式環境資料庫（唯讀）"
+
+# 環境變數對應：
+# dev  -> ORACLE_DEV_PASSWORD
+# test -> ORACLE_TEST_PASSWORD
+# prod -> ORACLE_PROD_PASSWORD
