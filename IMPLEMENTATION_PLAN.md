@@ -49,23 +49,50 @@
 
 ---
 
-## Phase 2: MCP Server 骨架 🔄
+## Phase 2: MCP Server 骨架 ✅
 
-### 2.1 Base Tool 類別 🔄
-- [ ] mcp_server/tools/base_tool.py
-  - [ ] Claude Agent SDK 整合
-  - [ ] 檔案讀寫管理
-  - [ ] 錯誤處理
-  - [ ] 結果快取機制
-  - [ ] 批次分析支援
+**狀態**: 已完成 (2025-10-03)
 
-### 2.2 MCP Server 主程式
-- [ ] mcp_server/springmvc_mcp_server.py
-  - [ ] MCP Protocol 實作
-  - [ ] Tool 註冊機制
-  - [ ] Slash Command 註冊機制
-  - [ ] 錯誤處理與日誌
-  - [ ] 狀態管理
+### 2.1 Base Tool 類別 ✅
+- [x] mcp_server/tools/base_tool.py (399 lines)
+  - [x] Claude Agent SDK 整合 (async/await pattern)
+  - [x] 檔案讀寫管理 (JSON load/save)
+  - [x] 錯誤處理 (comprehensive exception handling)
+  - [x] 結果快取機制 (with expiration support, default 7 days)
+  - [x] 批次分析支援 (batch_analyze method)
+  - [x] JSON 解析增強 (json-repair integration, multiple code blocks)
+  - [x] Windows UTF-8 支援 (console encoding fix)
+
+### 2.2 MCP Server 主程式 ✅
+- [x] mcp_server/springmvc_mcp_server.py (324 lines)
+  - [x] Tool 註冊機制 (register_tool method)
+  - [x] 已註冊 2 個工具:
+    - [x] extract_oracle_schema (標準 JSON Schema 格式)
+    - [x] analyze_stored_procedure (標準 JSON Schema 格式)
+  - [x] 參數驗證 (connection_name enum validation)
+  - [x] Slash Command 註冊機制 (register_command - Phase 4 實作)
+  - [x] 錯誤處理 (comprehensive error messages)
+  - [x] PEP 8 import 順序
+  - [x] Windows UTF-8 支援
+
+### 2.3 Phase 2 改進 (Code Review) ✅
+- [x] 修正工具參數 Schema 為標準 JSON Schema 格式
+- [x] 新增 connection_name 參數驗證 (enum: dev/test/prod)
+- [x] 修正 import 順序符合 PEP 8 標準
+- [x] 新增快取過期機制 (可配置天數)
+- [x] 改進 JSON 解析:
+  - [x] 支援多個 ```json``` code blocks (使用最後一個)
+  - [x] 整合 json-repair 庫處理不完整 JSON
+  - [x] Regex-based 提取提高穩健性
+- [x] 新增依賴: json-repair>=0.30.0
+
+**測試結果**:
+- ✅ MCP Server 啟動正常
+- ✅ 工具註冊成功 (2個工具)
+- ✅ JSON 解析測試通過 (標準、多區塊、修復)
+- ✅ 快取過期測試通過
+- ✅ 參數驗證測試通過
+- ✅ base_tool.py 測試套件全部通過
 
 ---
 
@@ -399,12 +426,14 @@
 
 ## 當前進度
 
-- [x] Phase 1: 基礎設施建設（100%）
-- [ ] Phase 2: MCP Server 骨架（10%）
+- [x] Phase 1: 基礎設施建設（100%） ✅ 2025-10-02
+- [x] Phase 2: MCP Server 骨架（100%） ✅ 2025-10-03
 - [ ] Phase 3: 程式碼分析工具（0%）
 - [ ] Phase 4: Slash Commands（0%）
 - [ ] Phase 5: 知識圖譜構建（0%）
 - [ ] Phase 6: 文檔與測試（5%）
 - [ ] Phase 7: 優化與擴展（0%）
 
-**下一步**: 完成 base_tool.py，然後建立 MCP Server 主程式與 Slash Commands 架構。
+**最新完成**: Phase 2 - MCP Server 骨架 + Code Review 改進
+
+**下一步**: Phase 3 - 程式碼分析工具（JSP → Controller → Service → MyBatis）

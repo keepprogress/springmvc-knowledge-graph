@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Claude Agent SDK](https://img.shields.io/badge/Claude%20Agent%20SDK-0.1.0%2B-orange.svg)](https://github.com/anthropics/claude-agent-sdk)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Phase%201%20Complete-success.svg)](IMPLEMENTATION_PLAN.md)
+[![Status](https://img.shields.io/badge/Status-Phase%202%20Complete-success.svg)](IMPLEMENTATION_PLAN.md)
 
 ## 📖 Overview
 
@@ -278,18 +278,25 @@ vim mcp_server/prompts/procedure_analysis.txt
 | Phase | 狀態 | 完成度 | 說明 |
 |-------|------|--------|------|
 | Phase 1: 基礎設施 | ✅ 完成 | 100% | DB 提取、Procedure 分析、文檔 |
-| Phase 2: MCP Server | 🔄 進行中 | 10% | base_tool.py、MCP 主程式 |
+| Phase 2: MCP Server | ✅ 完成 | 100% | base_tool.py (399行)、MCP 主程式 (324行)、Code Review 改進 |
 | Phase 3: 程式碼分析 | 📝 規劃中 | 0% | JSP、Controller、Service、MyBatis |
 | Phase 4: Slash Commands | 📝 規劃中 | 0% | /extract-oracle、/analyze-procedure 等 |
 | Phase 5: 知識圖譜 | 📝 規劃中 | 0% | Graph Builder、Query、Visualization |
 | Phase 6: 文檔與測試 | 📝 規劃中 | 5% | README、測試、範例 |
 | Phase 7: 優化擴展 | 📝 規劃中 | 0% | 效能優化、安全分析、CI/CD |
 
+**最新進展** (2025-10-03):
+- ✅ Phase 2 完成：MCP Server 骨架建設完成
+  - Base Tool 類別完整實作（快取、JSON 解析、批次分析）
+  - MCP Server 主程式（工具註冊、參數驗證）
+  - Code Review 改進（JSON Schema、json-repair、快取過期）
+- 📦 新增依賴：json-repair>=0.30.0（處理 LLM 輸出的不完整 JSON）
+
 詳見 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
 
 ## 🤝 貢獻
 
-目前專案由 [@keepprogress](https://github.com/keepprogress) 開發中，Phase 1 已完成。
+目前專案由 [@keepprogress](https://github.com/keepprogress) 開發中，Phase 1-2 已完成。
 
 ## 📄 License
 
