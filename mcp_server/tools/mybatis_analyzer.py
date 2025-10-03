@@ -647,7 +647,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Analyze MyBatis Mapper structure")
     parser.add_argument("interface_file", help="Path to Mapper interface Java file")
-    parser.add_argument("--xml", "-x", help="Path to Mapper XML file (optional)")
+    parser.add_argument("xml_file", nargs="?", help="Path to Mapper XML file (optional, positional)")
+    parser.add_argument("--xml", "-x", help="Path to Mapper XML file (alternative to positional)")
     parser.add_argument("--output", "-o", help="Output JSON file path")
     parser.add_argument("--force", "-f", action="store_true", help="Force refresh (ignore cache)")
 
@@ -659,8 +660,10 @@ if __name__ == "__main__":
     mapper_name = interface_path.stem  # UserMapper.java -> UserMapper
 
     context = {"interface_path": str(interface_path)}
-    if args.xml:
-        context["xml_path"] = args.xml
+    # Accept XML path from either positional arg or --xml flag
+    xml_path = args.xml_file or args.xml
+    if xml_path:
+        context["xml_path"] = xml_path
 
     result = analyzer.analyze(
         identifier=mapper_name,
