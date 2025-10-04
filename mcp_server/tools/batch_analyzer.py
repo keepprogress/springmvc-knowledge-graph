@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Optional
 from .project_scanner import ProjectScanner, ProjectStructure
 from .pattern_detector import PatternDetector, DetectedFiles
 from .parallel_executor import ParallelExecutor, AnalysisTask, BatchResult
+from .progress_tracker import ProgressTracker
+from .analysis_cache import AnalysisCache
+from .dependency_graph import DependencyGraphBuilder
 
 
 @dataclass
@@ -29,10 +32,12 @@ class BatchAnalysisReport:
     statistics: Dict[str, Any]
     issues: List[Dict[str, Any]] = field(default_factory=list)
     analysis_duration: float = 0.0
+    dependency_graph: Optional[Dict[str, Any]] = None
+    cache_stats: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
-        return {
+        result = {
             "project_root": str(self.project_root),
             "analyzed_at": self.analyzed_at.isoformat(),
             "project_type": self.project_type,
@@ -43,6 +48,14 @@ class BatchAnalysisReport:
             "analysis_duration_seconds": self.analysis_duration
         }
 
+        if self.dependency_graph:
+            result["dependency_graph"] = self.dependency_graph
+
+        if self.cache_stats:
+            result["cache_stats"] = self.cache_stats
+
+        return result
+
 
 class BatchAnalyzer:
     """Main batch analyzer orchestrator"""
@@ -51,7 +64,10 @@ class BatchAnalyzer:
         self,
         project_root: str,
         analyzers: Dict[str, Any],
-        max_workers: int = 10
+        max_workers: int = 10,
+        use_cache: bool = True,
+        cache_dir: str = ".batch_cache",
+        show_progress: bool = True
     ):
         """
         Initialize batch analyzer
@@ -60,15 +76,23 @@ class BatchAnalyzer:
             project_root: Root directory of project to analyze
             analyzers: Dictionary of analyzer instances
             max_workers: Maximum parallel workers
+            use_cache: Whether to use caching for incremental analysis
+            cache_dir: Directory for cache storage
+            show_progress: Whether to show progress bar
         """
         self.project_root = Path(project_root)
         self.analyzers = analyzers
         self.max_workers = max_workers
+        self.use_cache = use_cache
+        self.show_progress = show_progress
+
+        # Initialize cache
+        self.cache = AnalysisCache(cache_dir) if use_cache else None
 
     async def analyze_project(
         self,
         file_types: List[str] = None,
-        include_graph: bool = False,
+        include_graph: bool = True,
         progress_callback: Optional[callable] = None
     ) -> BatchAnalysisReport:
         """
@@ -98,24 +122,53 @@ class BatchAnalyzer:
         detector = PatternDetector(structure)
         detected = detector.detect_all(file_types)
 
-        # Step 3: Create analysis tasks
+        # Step 3: Create analysis tasks (with cache awareness)
         if progress_callback:
             progress_callback(f"Creating {detected.total_count()} analysis tasks...")
 
         tasks = self._create_tasks(detector, detected)
 
-        # Step 4: Execute parallel analysis
+        # Step 4: Execute parallel analysis with progress tracking
         if progress_callback:
             progress_callback(f"Analyzing {len(tasks)} components...")
+
+        # Initialize progress tracker
+        progress_tracker = ProgressTracker(
+            total_tasks=len(tasks),
+            show_progress=self.show_progress
+        )
+
+        def update_progress(file_name: str):
+            progress_tracker.update(file_name)
+            if progress_callback:
+                progress_callback(f"Analyzed: {file_name}")
 
         executor = ParallelExecutor(
             analyzers=self.analyzers,
             max_workers=self.max_workers
         )
 
-        batch_result = await executor.execute_all(tasks, progress_callback)
+        batch_result = await executor.execute_all(tasks)
+        progress_tracker.finish()
 
-        # Step 5: Generate report
+        # Step 5: Build dependency graph (if requested)
+        dependency_graph = None
+        if include_graph:
+            if progress_callback:
+                progress_callback("Building dependency graph...")
+
+            graph_builder = DependencyGraphBuilder()
+            graph = graph_builder.build(batch_result.by_type())
+
+            # Detect circular dependencies
+            cycles = graph_builder.detect_circular_dependencies()
+            depths = graph_builder.calculate_depth()
+
+            dependency_graph = graph.to_dict()
+            dependency_graph['circular_dependencies'] = cycles
+            dependency_graph['max_depth'] = max(depths.values()) if depths else 0
+
+        # Step 6: Generate report
         if progress_callback:
             progress_callback("Generating report...")
 
@@ -123,6 +176,7 @@ class BatchAnalyzer:
             structure=structure,
             detected=detected,
             batch_result=batch_result,
+            dependency_graph=dependency_graph,
             start_time=start_time
         )
 
@@ -182,6 +236,7 @@ class BatchAnalyzer:
         structure: ProjectStructure,
         detected: DetectedFiles,
         batch_result: BatchResult,
+        dependency_graph: Optional[Dict[str, Any]],
         start_time: datetime
     ) -> BatchAnalysisReport:
         """
@@ -233,6 +288,11 @@ class BatchAnalyzer:
         # Detect issues
         issues = self._detect_issues(results_by_type)
 
+        # Get cache stats
+        cache_stats = None
+        if self.cache:
+            cache_stats = self.cache.get_stats()
+
         return BatchAnalysisReport(
             project_root=self.project_root,
             analyzed_at=end_time,
@@ -241,7 +301,9 @@ class BatchAnalyzer:
             components=components,
             statistics=statistics,
             issues=issues,
-            analysis_duration=duration
+            analysis_duration=duration,
+            dependency_graph=dependency_graph,
+            cache_stats=cache_stats
         )
 
     def _calculate_statistics(

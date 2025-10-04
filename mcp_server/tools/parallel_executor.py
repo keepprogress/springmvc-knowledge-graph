@@ -67,11 +67,21 @@ class BatchResult:
 class ParallelExecutor:
     """Executes analysis tasks in parallel"""
 
+    # Default timeouts per analyzer type (in seconds)
+    DEFAULT_TIMEOUTS = {
+        'jsp': 10.0,
+        'controller': 15.0,
+        'service': 15.0,
+        'mybatis': 45.0,  # Longer for complex MyBatis XMLs
+    }
+
     def __init__(
         self,
         analyzers: Dict[str, BaseTool],
         max_workers: int = 10,
-        timeout_per_task: float = 30.0
+        timeout_per_task: float = 30.0,
+        timeouts_by_type: Optional[Dict[str, float]] = None,
+        batch_size: int = 100
     ):
         """
         Initialize parallel executor
@@ -79,12 +89,20 @@ class ParallelExecutor:
         Args:
             analyzers: Dictionary mapping analyzer type to analyzer instance
             max_workers: Maximum number of concurrent tasks
-            timeout_per_task: Timeout for each task in seconds
+            timeout_per_task: Default timeout for each task in seconds
+            timeouts_by_type: Custom timeouts per analyzer type
+            batch_size: Number of tasks to process in each batch (prevents file descriptor exhaustion)
         """
         self.analyzers = analyzers
         self.max_workers = max_workers
         self.timeout_per_task = timeout_per_task
+        self.batch_size = batch_size
         self.semaphore = asyncio.Semaphore(max_workers)
+
+        # Merge default timeouts with custom timeouts
+        self.timeouts = self.DEFAULT_TIMEOUTS.copy()
+        if timeouts_by_type:
+            self.timeouts.update(timeouts_by_type)
 
     async def execute_all(
         self,
@@ -92,7 +110,7 @@ class ParallelExecutor:
         progress_callback: Optional[callable] = None
     ) -> BatchResult:
         """
-        Execute all tasks in parallel
+        Execute all tasks in parallel with batching to prevent file descriptor exhaustion
 
         Args:
             tasks: List of analysis tasks
@@ -106,21 +124,27 @@ class ParallelExecutor:
         # Sort tasks by priority (higher priority first)
         sorted_tasks = sorted(tasks, key=lambda t: t.priority, reverse=True)
 
-        # Create async tasks
-        async_tasks = [
-            self._execute_task(task, progress_callback, len(tasks))
-            for task in sorted_tasks
-        ]
+        # Process in batches to prevent file descriptor exhaustion
+        all_results = []
+        for i in range(0, len(sorted_tasks), self.batch_size):
+            batch = sorted_tasks[i:i + self.batch_size]
 
-        # Execute all tasks
-        results = await asyncio.gather(*async_tasks, return_exceptions=True)
+            # Create async tasks for this batch
+            async_tasks = [
+                self._execute_task(task, progress_callback, len(tasks))
+                for task in batch
+            ]
+
+            # Execute batch
+            batch_results = await asyncio.gather(*async_tasks, return_exceptions=True)
+            all_results.extend(batch_results)
 
         # Process results
         task_results = []
         completed = 0
         failed = 0
 
-        for result in results:
+        for result in all_results:
             if isinstance(result, TaskResult):
                 task_results.append(result)
                 if result.success:
@@ -183,14 +207,17 @@ class ParallelExecutor:
                         error=f"No analyzer found for type: {task.analyzer_type}"
                     )
 
-                # Execute analysis with timeout
+                # Get timeout for this analyzer type
+                timeout = self.timeouts.get(task.analyzer_type, self.timeout_per_task)
+
+                # Execute analysis with type-specific timeout
                 result = await asyncio.wait_for(
                     analyzer.analyze_async(
                         identifier=task.identifier,
                         context=task.context,
                         force_refresh=True  # Batch analysis always refreshes
                     ),
-                    timeout=self.timeout_per_task
+                    timeout=timeout
                 )
 
                 end_time = datetime.now()
@@ -218,12 +245,15 @@ class ParallelExecutor:
                 end_time = datetime.now()
                 duration = (end_time - start_time).total_seconds()
 
+                # Get the timeout that was used for better error message
+                timeout = self.timeouts.get(task.analyzer_type, self.timeout_per_task)
+
                 return TaskResult(
                     task_id=task.task_id,
                     analyzer_type=task.analyzer_type,
                     identifier=task.identifier,
                     success=False,
-                    error=f"Analysis timeout after {self.timeout_per_task}s",
+                    error=f"Analysis timeout after {timeout}s",
                     duration_seconds=duration
                 )
 

@@ -33,6 +33,7 @@ Examples:
   /analyze-all --types controller,service
   /analyze-all -o analysis/report.json -p 20
   /analyze-all --types mybatis --output mappers.json
+  /analyze-all --no-cache --no-progress
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
@@ -71,7 +72,19 @@ Examples:
         parser.add_argument(
             '--no-cache',
             action='store_true',
-            help='Force refresh all analyses (ignore cache)'
+            help='Disable caching (force refresh all analyses)'
+        )
+
+        parser.add_argument(
+            '--cache-dir',
+            default='.batch_cache',
+            help='Cache directory (default: .batch_cache)'
+        )
+
+        parser.add_argument(
+            '--no-progress',
+            action='store_true',
+            help='Disable progress display'
         )
 
         return parser
@@ -97,11 +110,14 @@ Examples:
             'mybatis': self.server.mybatis_analyzer,
         }
 
-        # Create batch analyzer
+        # Create batch analyzer with cache and progress support
         batch = BatchAnalyzer(
             project_root=parsed_args.project_dir,
             analyzers=analyzers,
-            max_workers=parsed_args.parallel
+            max_workers=parsed_args.parallel,
+            use_cache=not parsed_args.no_cache,
+            cache_dir=parsed_args.cache_dir,
+            show_progress=not parsed_args.no_progress
         )
 
         # Progress tracking
@@ -124,7 +140,7 @@ Examples:
 
             # Build success response
             summary = report.summary
-            message = f"✓ Batch analysis complete: {summary['total_components']} components analyzed"
+            message = f"Batch analysis complete: {summary['total_components']} components analyzed"
 
             data = {
                 'project_root': str(report.project_root),
@@ -137,6 +153,10 @@ Examples:
                 'output_file': parsed_args.output,
                 'issues_count': len(report.issues)
             }
+
+            # Add cache stats if available
+            if report.cache_stats:
+                data['cache_stats'] = report.cache_stats
 
             # Add issues summary if any
             if report.issues:
