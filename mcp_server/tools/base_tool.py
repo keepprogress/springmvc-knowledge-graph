@@ -27,13 +27,8 @@ try:
 except ImportError:
     JSON_REPAIR_AVAILABLE = False
 
-# Windows console encoding fix
-if sys.platform == 'win32':
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    except AttributeError:
-        pass  # Already wrapped or not needed
+# Note: Windows console encoding is handled centrally in springmvc_mcp_server.py
+# to avoid "I/O operation on closed file" errors when multiple analyzers initialize
 
 
 class BaseTool:

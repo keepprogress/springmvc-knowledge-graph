@@ -31,63 +31,58 @@ All 4 Phase 3 tool handlers implemented:
 - ✅ Created `tests/test_mcp_phase3_tools.py`
 - ✅ Created `tests/test_mcp_simple.py`
 
-## ⚠️ Known Issues
+## ✅ Issues Resolved
 
-### Issue 1: Windows Console Encoding Conflict
+### Issue 1: Windows Console Encoding Conflict - FIXED ✅
 
 **Problem:** Multiple analyzer instances attempting to wrap stdout/stderr causes "I/O operation on closed file" error
 
 **Root Cause:** `base_tool.py` wraps stdout/stderr for Windows compatibility, but when multiple analyzers are initialized (JSP, Controller, Service, MyBatis), each tries to wrap already-wrapped streams.
 
-**Evidence:**
-```
-✓ tree-sitter-java initialized for scriptlet parsing  (JSP Analyzer - OK)
-⚠️  tree-sitter-java initialization failed: I/O operation on closed file.  (Controller - FAIL)
-⚠️  tree-sitter-java initialization failed: I/O operation on closed file.  (Service - FAIL)
-⚠️  tree-sitter-java initialization failed: I/O operation on closed file.  (MyBatis - FAIL)
-```
+**Solution Implemented:** Option 2 - Centralized Wrapping
+- ✅ Removed stdout/stderr wrapping from `base_tool.py`
+- ✅ Kept centralized wrapping in `springmvc_mcp_server.py` (single point)
+- ✅ Added comment in base_tool.py explaining the change
 
-**Impact:**
-- Tools are registered successfully
-- MCP server runs and lists tools correctly
-- **But**: Tool invocation may fail due to stdout issues
-
-**Solutions (for Phase 4.1):**
-
-**Option 1: Conditional Wrapping**
+**Fix Details:**
 ```python
-# In base_tool.py
-if sys.platform == 'win32' and not hasattr(sys.stdout, '_wrapped'):
+# base_tool.py - BEFORE
+if sys.platform == 'win32':
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stdout._wrapped = True  # Mark as wrapped
-        ...
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
     except AttributeError:
         pass
+
+# base_tool.py - AFTER
+# Note: Windows console encoding is handled centrally in springmvc_mcp_server.py
+# to avoid "I/O operation on closed file" errors when multiple analyzers initialize
 ```
 
-**Option 2: Centralized Wrapping**
-- Remove wrapping from base_tool.py
-- Only wrap in springmvc_mcp_server.py (single point)
+**Test Results - All Passed:**
+```
+✓ tree-sitter-java initialized for scriptlet parsing  (JSP - OK)
+✓ tree-sitter-java initialized  (Controller - OK)
+✓ tree-sitter-java initialized  (Service - OK)
+✓ tree-sitter-java initialized  (MyBatis - OK)
 
-**Option 3: Environment Variable Flag**
-```python
-# Set in MCP server before importing analyzers
-os.environ['SKIP_STDOUT_WRAP'] = '1'
+✓ PASS: analyze_jsp
+✓ PASS: analyze_controller
+✓ PASS: analyze_service
+✓ PASS: analyze_mybatis
 
-# Check in base_tool.py
-if sys.platform == 'win32' and not os.getenv('SKIP_STDOUT_WRAP'):
-    # wrap stdout/stderr
+Results: 4/4 tests passed
 ```
 
-**Recommended:** Option 2 (centralized wrapping)
+**Status:** ✅ RESOLVED - All MCP tools fully functional
 
 ##  📋 Remaining Tasks
 
-### Phase 4.1: Fix Stdout Wrapping Issue
-- [ ] Implement Option 2 (remove wrapping from base_tool.py)
-- [ ] Test all analyzers work through MCP server
-- [ ] Verify Windows compatibility
+### Phase 4.1: Fix Stdout Wrapping Issue ✅ COMPLETE
+- ✅ Implemented Option 2 (removed wrapping from base_tool.py)
+- ✅ Tested all analyzers work through MCP server
+- ✅ Verified Windows compatibility
+- ✅ All 4/4 integration tests passing
 
 ### Phase 4.2: Slash Commands
 - [ ] Create `mcp_server/commands/` directory
@@ -123,13 +118,14 @@ if sys.platform == 'win32' and not os.getenv('SKIP_STDOUT_WRAP'):
 |-----------|-----|--------|
 | MCP Server Update | ~200 | ✅ Complete |
 | Tool Handlers | ~150 | ✅ Complete |
-| Test Scripts | ~180 | ⚠️ Blocked by stdout issue |
-| **Sub-total** | **~530** | **70% Complete** |
+| Test Scripts | ~250 | ✅ Complete (4/4 tests passing) |
+| Stdout Fix | ~10 | ✅ Complete |
+| **Sub-total** | **~610** | **✅ 100% Complete** |
 | Slash Commands | ~400 | Pending |
 | Batch Analyzer | ~500 | Pending |
 | Integration Tests | ~300 | Pending |
 | Documentation | ~500 | Pending |
-| **Total Estimate** | **~2,230** | **24% Complete** |
+| **Total Estimate** | **~2,310** | **26% Complete** |
 
 ## 🔗 Files Modified
 
@@ -150,28 +146,36 @@ if sys.platform == 'win32' and not os.getenv('SKIP_STDOUT_WRAP'):
 **New file:** Simplified file-based test
 **Lines:** ~70
 
+### mcp_server/tools/base_tool.py
+**Changes:**
+- Removed stdout/stderr wrapping (lines 30-36 deleted)
+- Added comment explaining centralized wrapping
+
+**Fix:** Resolved "I/O operation on closed file" error
+
 ### docs/PHASE_4_PLAN.md
 **New file:** Phase 4 implementation plan
 **Lines:** ~300
 
 ## 🎯 Next Steps (Priority Order)
 
-1. **Fix stdout wrapping issue** (blocker for testing)
-2. **Verify tool functionality** with working tests
-3. **Implement slash commands** (user-facing CLI)
+1. ~~**Fix stdout wrapping issue**~~ ✅ COMPLETE
+2. ~~**Verify tool functionality**~~ ✅ COMPLETE (4/4 tests passing)
+3. **Implement slash commands** (user-facing CLI) ← NEXT
 4. **Create batch analyzer** (process entire projects)
 5. **Add comprehensive tests** (integration + unit)
 6. **Update documentation** (README + guides)
 
 ## 📝 Notes
 
-- MCP server successfully upgraded to v0.4.0-alpha
-- All Phase 3 analyzers properly integrated
-- Tool registration working as designed
-- Stdout wrapping issue is **non-blocking** for continued development
-- Can proceed with slash commands while fixing stdout issue in parallel
+- ✅ MCP server successfully upgraded to v0.4.0-alpha
+- ✅ All Phase 3 analyzers properly integrated
+- ✅ Tool registration working perfectly
+- ✅ Stdout wrapping issue **RESOLVED**
+- ✅ All integration tests passing (4/4)
+- ✅ Phase 4.1 complete - Ready for slash commands
 
 ---
 
 *Last Updated: 2025-10-04*
-*Status: Phase 4 - 24% Complete (530/2,230 LOC)*
+*Status: Phase 4.1 - COMPLETE | Phase 4 - 26% Complete (610/2,310 LOC)*
