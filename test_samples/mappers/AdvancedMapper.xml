@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.AdvancedMapper">
+
+    <!-- Test 1: Schema-qualified table names -->
+    <select id="testSchemaQualified" resultType="User">
+        SELECT u.id, u.username
+        FROM myschema.users u
+        WHERE u.status = #{status}
+    </select>
+
+    <!-- Test 2: Table aliases (with and without AS) -->
+    <select id="testTableAliases" resultType="Order">
+        SELECT o.id, o.total
+        FROM orders o
+        WHERE o.user_id = #{userId}
+    </select>
+
+    <!-- Test 3: LEFT JOIN -->
+    <select id="testLeftJoin" resultType="UserWithOrders">
+        SELECT u.*, o.id as order_id
+        FROM users u
+        LEFT JOIN orders o ON u.id = o.user_id
+        WHERE u.id = #{userId}
+    </select>
+
+    <!-- Test 4: INNER JOIN with schema and aliases -->
+    <select id="testInnerJoinSchemaAlias" resultType="OrderDetail">
+        SELECT o.id, od.product_id, od.quantity
+        FROM myschema.orders AS o
+        INNER JOIN myschema.order_details od ON o.id = od.order_id
+        WHERE o.status = #{status}
+    </select>
+
+    <!-- Test 5: Multiple JOINs (LEFT, INNER, RIGHT) -->
+    <select id="testMultipleJoins" resultType="ComplexResult">
+        SELECT u.username, o.total, p.name as product_name
+        FROM users u
+        LEFT JOIN orders o ON u.id = o.user_id
+        INNER JOIN order_details od ON o.id = od.order_id
+        RIGHT JOIN products p ON od.product_id = p.id
+        WHERE u.status = 'active'
+    </select>
+
+    <!-- Test 6: CROSS JOIN -->
+    <select id="testCrossJoin" resultType="Config">
+        SELECT *
+        FROM system_config
+        CROSS JOIN global_settings
+        WHERE system_config.type = #{type}
+    </select>
+
+    <!-- Test 7: INSERT with schema-qualified table -->
+    <insert id="testInsertSchema">
+        INSERT INTO myschema.audit_log (action, user_id, timestamp)
+        VALUES (#{action}, #{userId}, SYSDATE)
+    </insert>
+
+    <!-- Test 8: UPDATE with alias (edge case) -->
+    <update id="testUpdateAlias">
+        UPDATE orders o
+        SET o.status = #{status}
+        WHERE o.id = #{orderId}
+    </update>
+
+    <!-- Test 9: Complex query with nested fragment includes -->
+    <sql id="orderColumns">
+        o.id, o.user_id, o.total, o.status
+    </sql>
+
+    <sql id="extendedOrderColumns">
+        <include refid="orderColumns"/>, o.created_at
+    </sql>
+
+    <select id="testNestedFragments" resultType="Order">
+        SELECT <include refid="extendedOrderColumns"/>
+        FROM orders o
+        WHERE o.status IN ('pending', 'processing')
+    </select>
+
+    <!-- Test 10: Multiple schemas in one query -->
+    <select id="testMultipleSchemas" resultType="JoinResult">
+        SELECT t1.id, t2.name
+        FROM schema1.table1 t1
+        JOIN schema2.table2 t2 ON t1.ref_id = t2.id
+        WHERE t1.active = 1
+    </select>
+
+</mapper>

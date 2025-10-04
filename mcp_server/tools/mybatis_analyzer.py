@@ -417,7 +417,8 @@ class MyBatisAnalyzer(BaseTool):
 
         # Pattern 2: JOIN table_name (all JOIN types)
         # Matches: JOIN, LEFT JOIN, INNER JOIN, etc.
-        join_matches = re.findall(r'\b(?:LEFT|RIGHT|INNER|OUTER|CROSS)?\s*JOIN\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
+        # More precise: requires space after JOIN type, preventing false matches
+        join_matches = re.findall(r'\b(?:(?:LEFT|RIGHT|INNER|OUTER|CROSS)\s+)?JOIN\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
         tables.update(join_matches)
 
         # Pattern 3: INTO table_name (INSERT statements)
@@ -645,7 +646,24 @@ if __name__ == "__main__":
     import argparse
     import json
 
-    parser = argparse.ArgumentParser(description="Analyze MyBatis Mapper structure")
+    parser = argparse.ArgumentParser(
+        description="Analyze MyBatis Mapper structure",
+        epilog="""
+Examples:
+  # Positional syntax (both files)
+  %(prog)s UserMapper.java UserMapper.xml
+
+  # Flag-based syntax (explicit)
+  %(prog)s UserMapper.java --xml UserMapper.xml
+
+  # Interface only (no XML)
+  %(prog)s UserMapper.java
+
+  # Save to file
+  %(prog)s UserMapper.java UserMapper.xml --output result.json
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("interface_file", help="Path to Mapper interface Java file")
     parser.add_argument("xml_file", nargs="?", help="Path to Mapper XML file (optional, positional)")
     parser.add_argument("--xml", "-x", help="Path to Mapper XML file (alternative to positional)")
