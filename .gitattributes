@@ -1,0 +1,32 @@
+# Line ending normalization
+* text=auto
+
+# Python files should use LF
+*.py text eol=lf
+
+# Shell scripts should use LF
+*.sh text eol=lf
+
+# Windows batch files should use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# JSON, YAML, XML should use LF
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+
+# Markdown and text files should use LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.class binary
+*.war binary

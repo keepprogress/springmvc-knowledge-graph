@@ -50,7 +50,9 @@ from mcp_server.commands import (
     AnalyzeControllerCommand,
     AnalyzeServiceCommand,
     AnalyzeMyBatisCommand,
-    AnalyzeAllCommand
+    AnalyzeAllCommand,
+    FindChainCommand,
+    ImpactAnalysisCommand
 )
 
 
@@ -59,7 +61,7 @@ class SpringMVCMCPServer:
 
     def __init__(self, project_root: str = ".", log_level: str = "INFO"):
         self.name = "springmvc-analyzer"
-        self.version = "0.4.0-alpha"  # Phase 4
+        self.version = "0.4.4-alpha"  # Phase 4.4 - Query Engine
         self.project_root = Path(project_root)
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.commands: Dict[str, Dict[str, Any]] = {}
@@ -93,6 +95,10 @@ class SpringMVCMCPServer:
             'mb': AnalyzeMyBatisCommand(self),  # Short alias
             'analyze-all': AnalyzeAllCommand(self),
             'batch': AnalyzeAllCommand(self),  # Alias
+            'find-chain': FindChainCommand(self),
+            'chain': FindChainCommand(self),  # Alias
+            'impact-analysis': ImpactAnalysisCommand(self),
+            'impact': ImpactAnalysisCommand(self),  # Alias
         }
 
         # Initialize tool and command registry
