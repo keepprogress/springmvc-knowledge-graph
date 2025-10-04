@@ -32,19 +32,32 @@ except ImportError:
     print("⚠️  MCP SDK not fully available, running in stub mode", file=sys.stderr)
     MCP_AVAILABLE = False
 
-# Import analysis tools
+# Import analysis tools (Phase 1 & 2)
 from mcp_server.tools.db_extractor import extract_db_schema_by_config, extract_oracle_schema
 from mcp_server.tools.procedure_analyzer import analyze_stored_procedures
+
+# Import Phase 3 analyzers
+from mcp_server.tools.jsp_analyzer import JSPAnalyzer
+from mcp_server.tools.controller_analyzer import ControllerAnalyzer
+from mcp_server.tools.service_analyzer import ServiceAnalyzer
+from mcp_server.tools.mybatis_analyzer import MyBatisAnalyzer
 
 
 class SpringMVCMCPServer:
     """SpringMVC Knowledge Graph MCP Server"""
 
-    def __init__(self):
+    def __init__(self, project_root: str = "."):
         self.name = "springmvc-analyzer"
-        self.version = "0.2.0-alpha"  # Phase 2
+        self.version = "0.4.0-alpha"  # Phase 4
+        self.project_root = Path(project_root)
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.commands: Dict[str, Dict[str, Any]] = {}
+
+        # Initialize Phase 3 analyzers
+        self.jsp_analyzer = JSPAnalyzer(project_root=str(self.project_root))
+        self.controller_analyzer = ControllerAnalyzer(project_root=str(self.project_root))
+        self.service_analyzer = ServiceAnalyzer(project_root=str(self.project_root))
+        self.mybatis_analyzer = MyBatisAnalyzer(project_root=str(self.project_root))
 
         # Initialize tool registry
         self._register_tools()
@@ -106,7 +119,115 @@ class SpringMVCMCPServer:
             handler=self._handle_analyze_procedure
         )
 
-        print(f"✓ 已註冊 {len(self.tools)} 個 MCP Tools", file=sys.stderr)
+        # Tool 3: Analyze JSP (Phase 3.1)
+        self.register_tool(
+            name="analyze_jsp",
+            description="Analyze JSP file structure and extract UI components",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "jsp_file": {
+                        "type": "string",
+                        "description": "Path to JSP file"
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "Output JSON file path"
+                    },
+                    "force_refresh": {
+                        "type": "boolean",
+                        "description": "Force refresh (ignore cache)",
+                        "default": False
+                    }
+                },
+                "required": ["jsp_file"]
+            },
+            handler=self._handle_analyze_jsp
+        )
+
+        # Tool 4: Analyze Controller (Phase 3.2)
+        self.register_tool(
+            name="analyze_controller",
+            description="Analyze Spring MVC Controller structure",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "controller_file": {
+                        "type": "string",
+                        "description": "Path to Controller Java file"
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "Output JSON file path"
+                    },
+                    "force_refresh": {
+                        "type": "boolean",
+                        "description": "Force refresh (ignore cache)",
+                        "default": False
+                    }
+                },
+                "required": ["controller_file"]
+            },
+            handler=self._handle_analyze_controller
+        )
+
+        # Tool 5: Analyze Service (Phase 3.3)
+        self.register_tool(
+            name="analyze_service",
+            description="Analyze Spring Service layer structure",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "service_file": {
+                        "type": "string",
+                        "description": "Path to Service Java file"
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "Output JSON file path"
+                    },
+                    "force_refresh": {
+                        "type": "boolean",
+                        "description": "Force refresh (ignore cache)",
+                        "default": False
+                    }
+                },
+                "required": ["service_file"]
+            },
+            handler=self._handle_analyze_service
+        )
+
+        # Tool 6: Analyze MyBatis Mapper (Phase 3.4)
+        self.register_tool(
+            name="analyze_mybatis",
+            description="Analyze MyBatis Mapper (interface + XML)",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "interface_file": {
+                        "type": "string",
+                        "description": "Path to Mapper interface Java file"
+                    },
+                    "xml_file": {
+                        "type": "string",
+                        "description": "Path to Mapper XML file"
+                    },
+                    "output_file": {
+                        "type": "string",
+                        "description": "Output JSON file path"
+                    },
+                    "force_refresh": {
+                        "type": "boolean",
+                        "description": "Force refresh (ignore cache)",
+                        "default": False
+                    }
+                },
+                "required": ["interface_file"]
+            },
+            handler=self._handle_analyze_mybatis
+        )
+
+        print(f"✓ Registered {len(self.tools)} MCP Tools", file=sys.stderr)
 
     def register_tool(
         self,
@@ -238,6 +359,159 @@ class SpringMVCMCPServer:
                 "success": False,
                 "error": f"分析失敗: {str(e)}"
             }
+
+    async def _handle_analyze_jsp(self, **kwargs) -> Dict[str, Any]:
+        """Handle analyze_jsp tool call (Phase 3.1)"""
+        jsp_file = kwargs.get("jsp_file")
+        output_file = kwargs.get("output_file")
+        force_refresh = kwargs.get("force_refresh", False)
+
+        if not jsp_file:
+            return {"success": False, "error": "jsp_file is required"}
+
+        try:
+            jsp_path = self.project_root / jsp_file
+            identifier = jsp_path.stem  # filename without extension
+
+            context = {"file_path": str(jsp_path)}
+
+            result = await self.jsp_analyzer.analyze_async(
+                identifier=identifier,
+                context=context,
+                force_refresh=force_refresh
+            )
+
+            # Save to output file if specified
+            if output_file:
+                output_path = self.project_root / output_file
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✓ JSP analysis complete: {jsp_file}",
+                "result": result,
+                "output_file": output_file
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"JSP analysis failed: {str(e)}"}
+
+    async def _handle_analyze_controller(self, **kwargs) -> Dict[str, Any]:
+        """Handle analyze_controller tool call (Phase 3.2)"""
+        controller_file = kwargs.get("controller_file")
+        output_file = kwargs.get("output_file")
+        force_refresh = kwargs.get("force_refresh", False)
+
+        if not controller_file:
+            return {"success": False, "error": "controller_file is required"}
+
+        try:
+            controller_path = self.project_root / controller_file
+            identifier = controller_path.stem
+
+            context = {"file_path": str(controller_path)}
+
+            result = await self.controller_analyzer.analyze_async(
+                identifier=identifier,
+                context=context,
+                force_refresh=force_refresh
+            )
+
+            if output_file:
+                output_path = self.project_root / output_file
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✓ Controller analysis complete: {controller_file}",
+                "result": result,
+                "output_file": output_file
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Controller analysis failed: {str(e)}"}
+
+    async def _handle_analyze_service(self, **kwargs) -> Dict[str, Any]:
+        """Handle analyze_service tool call (Phase 3.3)"""
+        service_file = kwargs.get("service_file")
+        output_file = kwargs.get("output_file")
+        force_refresh = kwargs.get("force_refresh", False)
+
+        if not service_file:
+            return {"success": False, "error": "service_file is required"}
+
+        try:
+            service_path = self.project_root / service_file
+            identifier = service_path.stem
+
+            context = {"file_path": str(service_path)}
+
+            result = await self.service_analyzer.analyze_async(
+                identifier=identifier,
+                context=context,
+                force_refresh=force_refresh
+            )
+
+            if output_file:
+                output_path = self.project_root / output_file
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✓ Service analysis complete: {service_file}",
+                "result": result,
+                "output_file": output_file
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Service analysis failed: {str(e)}"}
+
+    async def _handle_analyze_mybatis(self, **kwargs) -> Dict[str, Any]:
+        """Handle analyze_mybatis tool call (Phase 3.4)"""
+        interface_file = kwargs.get("interface_file")
+        xml_file = kwargs.get("xml_file")
+        output_file = kwargs.get("output_file")
+        force_refresh = kwargs.get("force_refresh", False)
+
+        if not interface_file:
+            return {"success": False, "error": "interface_file is required"}
+
+        try:
+            interface_path = self.project_root / interface_file
+            identifier = interface_path.stem
+
+            context = {"interface_path": str(interface_path)}
+            if xml_file:
+                xml_path = self.project_root / xml_file
+                context["xml_path"] = str(xml_path)
+
+            result = await self.mybatis_analyzer.analyze_async(
+                identifier=identifier,
+                context=context,
+                force_refresh=force_refresh
+            )
+
+            if output_file:
+                output_path = self.project_root / output_file
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✓ MyBatis analysis complete: {interface_file}",
+                "result": result,
+                "output_file": output_file
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"MyBatis analysis failed: {str(e)}"}
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
