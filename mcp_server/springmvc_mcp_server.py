@@ -49,7 +49,8 @@ from mcp_server.commands import (
     AnalyzeJSPCommand,
     AnalyzeControllerCommand,
     AnalyzeServiceCommand,
-    AnalyzeMyBatisCommand
+    AnalyzeMyBatisCommand,
+    AnalyzeAllCommand
 )
 
 
@@ -90,6 +91,8 @@ class SpringMVCMCPServer:
             'analyze-mybatis': AnalyzeMyBatisCommand(self),
             'mybatis': AnalyzeMyBatisCommand(self),  # Alias
             'mb': AnalyzeMyBatisCommand(self),  # Short alias
+            'analyze-all': AnalyzeAllCommand(self),
+            'batch': AnalyzeAllCommand(self),  # Alias
         }
 
         # Initialize tool and command registry
