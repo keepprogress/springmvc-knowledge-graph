@@ -11,6 +11,8 @@ Phase 2: Basic skeleton with tool registration infrastructure
 import asyncio
 import io
 import json
+import logging
+import shlex
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List
@@ -42,16 +44,34 @@ from mcp_server.tools.controller_analyzer import ControllerAnalyzer
 from mcp_server.tools.service_analyzer import ServiceAnalyzer
 from mcp_server.tools.mybatis_analyzer import MyBatisAnalyzer
 
+# Import Phase 4 slash commands
+from mcp_server.commands import (
+    AnalyzeJSPCommand,
+    AnalyzeControllerCommand,
+    AnalyzeServiceCommand,
+    AnalyzeMyBatisCommand
+)
+
 
 class SpringMVCMCPServer:
     """SpringMVC Knowledge Graph MCP Server"""
 
-    def __init__(self, project_root: str = "."):
+    def __init__(self, project_root: str = ".", log_level: str = "INFO"):
         self.name = "springmvc-analyzer"
         self.version = "0.4.0-alpha"  # Phase 4
         self.project_root = Path(project_root)
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.commands: Dict[str, Dict[str, Any]] = {}
+
+        # Initialize logging
+        self.logger = logging.getLogger('springmvc_mcp_server')
+        self.logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+        if not self.logger.handlers:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            ))
+            self.logger.addHandler(handler)
 
         # Initialize Phase 3 analyzers
         self.jsp_analyzer = JSPAnalyzer(project_root=str(self.project_root))
@@ -59,8 +79,22 @@ class SpringMVCMCPServer:
         self.service_analyzer = ServiceAnalyzer(project_root=str(self.project_root))
         self.mybatis_analyzer = MyBatisAnalyzer(project_root=str(self.project_root))
 
-        # Initialize tool registry
+        # Initialize Phase 4 slash commands
+        self._command_instances = {
+            'analyze-jsp': AnalyzeJSPCommand(self),
+            'jsp': AnalyzeJSPCommand(self),  # Alias
+            'analyze-controller': AnalyzeControllerCommand(self),
+            'controller': AnalyzeControllerCommand(self),  # Alias
+            'analyze-service': AnalyzeServiceCommand(self),
+            'service': AnalyzeServiceCommand(self),  # Alias
+            'analyze-mybatis': AnalyzeMyBatisCommand(self),
+            'mybatis': AnalyzeMyBatisCommand(self),  # Alias
+            'mb': AnalyzeMyBatisCommand(self),  # Short alias
+        }
+
+        # Initialize tool and command registry
         self._register_tools()
+        self._register_commands()
 
     def _register_tools(self):
         """
@@ -228,6 +262,16 @@ class SpringMVCMCPServer:
         )
 
         print(f"✓ Registered {len(self.tools)} MCP Tools", file=sys.stderr)
+
+    def _register_commands(self):
+        """Register all slash commands (Phase 4.2)"""
+        for cmd_name, cmd_instance in self._command_instances.items():
+            self.register_command(
+                name=cmd_name,
+                description=cmd_instance.get_description(),
+                handler=cmd_instance
+            )
+        print(f"✓ Registered {len(self.commands)} Slash Commands", file=sys.stderr)
 
     def register_tool(
         self,
@@ -542,6 +586,68 @@ class SpringMVCMCPServer:
                 "error": f"工具執行錯誤: {str(e)}"
             }
 
+    async def handle_command(self, command_line: str) -> Dict[str, Any]:
+        """
+        Handle slash command execution (Phase 4.2)
+
+        Args:
+            command_line: Full command line (e.g., "/analyze-jsp user.jsp --output out.json")
+
+        Returns:
+            Command execution result
+        """
+        self.logger.info(f"Command received: {command_line}")
+
+        # Parse command line with proper quote handling
+        try:
+            parts = shlex.split(command_line.strip())
+        except ValueError as e:
+            error_msg = f"Invalid command syntax: {e}"
+            self.logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+
+        if not parts or not parts[0].startswith('/'):
+            error_msg = "Invalid command format. Commands must start with '/'"
+            self.logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+
+        command_name = parts[0][1:]  # Remove leading '/'
+        args = parts[1:]  # Remaining arguments
+
+        if command_name not in self.commands:
+            error_msg = f"Unknown command: /{command_name}"
+            self.logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+
+        command = self.commands[command_name]
+        handler = command["handler"]
+
+        try:
+            result = await handler.execute(args)
+
+            if result.get('success'):
+                self.logger.info(f"Command succeeded: /{command_name}")
+            else:
+                self.logger.error(f"Command failed: {result.get('error')}")
+
+            return result
+        except Exception as e:
+            error_msg = f"Command execution error: {str(e)}"
+            self.logger.exception(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+
     def list_tools(self) -> List[Dict[str, Any]]:
         """列出所有可用工具"""
         return [
@@ -552,6 +658,35 @@ class SpringMVCMCPServer:
             }
             for tool in self.tools.values()
         ]
+
+    def list_commands(self) -> List[Dict[str, Any]]:
+        """
+        List all available slash commands
+
+        Returns:
+            List of command definitions with name and description
+        """
+        # Deduplicate commands (remove aliases)
+        seen = set()
+        commands = []
+
+        for cmd_name, cmd in self.commands.items():
+            handler = cmd["handler"]
+            # Use handler object id to detect duplicates (aliases)
+            handler_id = id(handler)
+
+            if handler_id not in seen:
+                seen.add(handler_id)
+                # Find all aliases for this command
+                aliases = [name for name, c in self.commands.items() if id(c["handler"]) == handler_id]
+
+                commands.append({
+                    "name": f"/{cmd['name']}",
+                    "description": cmd["description"],
+                    "aliases": [f"/{alias}" for alias in aliases if alias != cmd_name]
+                })
+
+        return sorted(commands, key=lambda x: x['name'])
 
     def run(self):
         """
