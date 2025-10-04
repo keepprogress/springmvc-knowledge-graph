@@ -83,6 +83,33 @@ class MyBatisAnalyzer(BaseTool):
             except Exception as e:
                 print(f"⚠️  tree-sitter-java initialization failed: {e}", file=sys.stderr)
 
+        # Compile regex patterns for performance optimization
+        # Pattern 1: FROM table_name (with optional schema and alias)
+        self._from_pattern = re.compile(
+            r'\bFROM\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?',
+            re.IGNORECASE
+        )
+        # Pattern 2: JOIN table_name (all JOIN types)
+        self._join_pattern = re.compile(
+            r'\b(?:(?:LEFT|RIGHT|INNER|OUTER|CROSS)\s+)?JOIN\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?',
+            re.IGNORECASE
+        )
+        # Pattern 3: INTO table_name (INSERT statements)
+        self._into_pattern = re.compile(
+            r'\bINTO\s+(?:[\w]+\.)?([\w]+)',
+            re.IGNORECASE
+        )
+        # Pattern 4: UPDATE table_name
+        self._update_pattern = re.compile(
+            r'\bUPDATE\s+(?:[\w]+\.)?([\w]+)',
+            re.IGNORECASE
+        )
+        # Pattern 5: Comma-separated tables (legacy SQL)
+        self._comma_tables_pattern = re.compile(
+            r'\bFROM\s+((?:[\w]+\.)?\w+(?:\s+(?:AS\s+)?[\w]+)?(?:\s*,\s*(?:[\w]+\.)?\w+(?:\s+(?:AS\s+)?[\w]+)?)+)',
+            re.IGNORECASE
+        )
+
     async def analyze_async(
         self,
         identifier: str,
@@ -391,43 +418,50 @@ class MyBatisAnalyzer(BaseTool):
         """
         Extract table names from SQL
 
-        Expected Coverage: ~75% (improved pattern matching)
+        Expected Coverage: ~80% (optimized pattern matching with compiled regex)
 
         Supported Patterns:
         - Simple table names: FROM users, JOIN orders
         - Schema-qualified: FROM schema.users → extracts "users"
         - Table aliases: FROM users u, FROM users AS u
         - Multiple joins: LEFT JOIN, INNER JOIN, etc.
+        - Comma-separated tables (legacy): FROM users, orders WHERE...
 
         Known Limitations (deferred to Phase 5 LLM):
         - Subqueries: FROM (SELECT ...) subquery
         - Common Table Expressions (CTEs): WITH cte AS (...)
         - Dynamic table names: FROM ${tableName}
-        - Complex expressions: FROM table1, table2 WHERE ...
 
         Phase 5 LLM will handle complex queries with full semantic understanding.
         """
         sql_text = self._extract_sql_text(elem)
         tables = set()
 
-        # Pattern 1: FROM table_name (with optional schema and alias)
-        # Matches: FROM users, FROM schema.users, FROM users u, FROM users AS u
-        from_matches = re.findall(r'\bFROM\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
+        # Pattern 1: FROM table_name (uses compiled regex for performance)
+        from_matches = self._from_pattern.findall(sql_text)
         tables.update(from_matches)
 
-        # Pattern 2: JOIN table_name (all JOIN types)
-        # Matches: JOIN, LEFT JOIN, INNER JOIN, etc.
-        # More precise: requires space after JOIN type, preventing false matches
-        join_matches = re.findall(r'\b(?:(?:LEFT|RIGHT|INNER|OUTER|CROSS)\s+)?JOIN\s+(?:[\w]+\.)?([\w]+)(?:\s+(?:AS\s+)?[\w]+)?', sql_text, re.IGNORECASE)
+        # Pattern 2: JOIN table_name (uses compiled regex for performance)
+        join_matches = self._join_pattern.findall(sql_text)
         tables.update(join_matches)
 
-        # Pattern 3: INTO table_name (INSERT statements)
-        into_matches = re.findall(r'\bINTO\s+(?:[\w]+\.)?([\w]+)', sql_text, re.IGNORECASE)
+        # Pattern 3: INTO table_name (uses compiled regex for performance)
+        into_matches = self._into_pattern.findall(sql_text)
         tables.update(into_matches)
 
-        # Pattern 4: UPDATE table_name
-        update_matches = re.findall(r'\bUPDATE\s+(?:[\w]+\.)?([\w]+)', sql_text, re.IGNORECASE)
+        # Pattern 4: UPDATE table_name (uses compiled regex for performance)
+        update_matches = self._update_pattern.findall(sql_text)
         tables.update(update_matches)
+
+        # Pattern 5: Comma-separated tables (legacy SQL: FROM users, orders)
+        comma_matches = self._comma_tables_pattern.findall(sql_text)
+        for match in comma_matches:
+            # Extract individual table names from comma-separated list
+            for table_part in match.split(','):
+                # Extract table name (remove schema and alias)
+                table_match = re.search(r'(?:[\w]+\.)?([\w]+)', table_part.strip())
+                if table_match:
+                    tables.add(table_match.group(1))
 
         return sorted(list(tables))
 

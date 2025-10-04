@@ -36,4 +36,8 @@ public interface AdvancedMapper {
     Object testNestedFragments();
 
     Object testMultipleSchemas();
+
+    Object testCommaSeparatedTables();
+
+    Object testCommaSeparatedSchemaAlias();
 }

@@ -88,4 +88,18 @@
         WHERE t1.active = 1
     </select>
 
+    <!-- Test 11: Comma-separated tables (legacy SQL) -->
+    <select id="testCommaSeparatedTables" resultType="LegacyResult">
+        SELECT u.username, o.total
+        FROM users u, orders o
+        WHERE u.id = o.user_id
+    </select>
+
+    <!-- Test 12: Comma-separated with schema and aliases -->
+    <select id="testCommaSeparatedSchemaAlias" resultType="ComplexLegacy">
+        SELECT *
+        FROM myschema.users AS u, orders o, myschema.products p
+        WHERE u.id = o.user_id AND o.product_id = p.id
+    </select>
+
 </mapper>

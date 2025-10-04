@@ -1,0 +1,95 @@
+name: Validate MyBatis Analyzer
+
+on:
+  push:
+    branches: [ master, main, develop ]
+    paths:
+      - 'mcp_server/tools/mybatis_analyzer.py'
+      - 'test_samples/mappers/**'
+      - 'scripts/validate_optimizations.py'
+  pull_request:
+    branches: [ master, main, develop ]
+    paths:
+      - 'mcp_server/tools/mybatis_analyzer.py'
+      - 'test_samples/mappers/**'
+      - 'scripts/validate_optimizations.py'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tree-sitter tree-sitter-java lxml
+
+    - name: Run validation script
+      run: |
+        python scripts/validate_optimizations.py
+
+    - name: Test MyBatis Analyzer - Basic
+      run: |
+        python -m mcp_server.tools.mybatis_analyzer \
+          test_samples/mappers/UserMapper.java \
+          test_samples/mappers/UserMapper.xml \
+          --output /tmp/test_basic.json
+
+    - name: Test MyBatis Analyzer - Advanced
+      run: |
+        python -m mcp_server.tools.mybatis_analyzer \
+          test_samples/mappers/AdvancedMapper.java \
+          test_samples/mappers/AdvancedMapper.xml \
+          --output /tmp/test_advanced.json
+
+    - name: Verify test results
+      run: |
+        python -c "
+        import json
+
+        # Verify basic test
+        with open('/tmp/test_basic.json') as f:
+            basic = json.load(f)
+            assert basic['statistics']['mapped_methods'] == 7, 'Basic test failed'
+            print('✓ Basic test passed: 7/7 methods mapped')
+
+        # Verify advanced test
+        with open('/tmp/test_advanced.json') as f:
+            advanced = json.load(f)
+            assert advanced['statistics']['mapped_methods'] == 12, 'Advanced test failed'
+
+            # Verify comma-separated tables extraction
+            statements = {s['id']: s for s in advanced['xml']['statements']}
+
+            # Test comma-separated tables
+            comma_test = statements.get('testCommaSeparatedTables')
+            assert comma_test, 'testCommaSeparatedTables not found'
+            assert set(comma_test['tables']) == {'orders', 'users'}, f\"Expected ['orders', 'users'], got {comma_test['tables']}\"
+            print('✓ Comma-separated tables test passed: users, orders extracted')
+
+            # Test comma-separated with schema and aliases
+            comma_schema_test = statements.get('testCommaSeparatedSchemaAlias')
+            assert comma_schema_test, 'testCommaSeparatedSchemaAlias not found'
+            assert set(comma_schema_test['tables']) == {'orders', 'products', 'users'}, f\"Expected ['orders', 'products', 'users'], got {comma_schema_test['tables']}\"
+            print('✓ Comma-separated schema/alias test passed: users, orders, products extracted')
+
+            print(f'✓ Advanced test passed: {advanced[\"statistics\"][\"mapped_methods\"]}/{advanced[\"statistics\"][\"mapped_methods\"]} methods mapped')
+        "
+
+    - name: Summary
+      if: success()
+      run: |
+        echo "✓ All MyBatis Analyzer validation tests passed"
+        echo "  - Validation script: PASSED"
+        echo "  - Basic test (7 methods): PASSED"
+        echo "  - Advanced test (12 methods): PASSED"
+        echo "  - Comma-separated tables: PASSED"
+        echo "  - Performance optimizations: VALIDATED"
