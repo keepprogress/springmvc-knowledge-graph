@@ -10,11 +10,14 @@ Provides query capabilities for dependency graph analysis including:
 """
 
 import logging
+import time
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .dependency_graph import DependencyGraph
+from ..config import QUERY
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +80,24 @@ class QueryEngine:
             graph: DependencyGraph to query
         """
         self.graph = graph
+        self._path_count = 0  # Track paths found during DFS
+
+        # Build edge lookup map for O(1) access (optimization)
+        if QUERY.ENABLE_EDGE_LOOKUP_CACHE:
+            self._edge_map = defaultdict(list)
+            for edge in graph.edges:
+                key = (edge[0], edge[1])
+                self._edge_map[key].append(edge[2])
+            logger.debug(f"Built edge lookup map with {len(self._edge_map)} entries")
+        else:
+            self._edge_map = None
 
     def find_call_chains(
         self,
         start_node: str,
         end_node: Optional[str] = None,
-        max_depth: int = 10
+        max_depth: int = None,
+        max_paths: int = None
     ) -> List[CallChain]:
         """
         Find call chains from start node to end node
@@ -90,19 +105,42 @@ class QueryEngine:
         Args:
             start_node: Starting node name
             end_node: Ending node name (if None, returns direct dependencies)
-            max_depth: Maximum depth to search
+            max_depth: Maximum depth to search (default: QUERY.DEFAULT_MAX_DEPTH_CHAIN)
+            max_paths: Maximum number of paths to return (default: QUERY.MAX_PATHS_LIMIT)
+                      Prevents path explosion in highly connected graphs
 
         Returns:
-            List of CallChain objects
+            List of CallChain objects (limited to max_paths)
         """
+        # Use defaults from config if not specified
+        if max_depth is None:
+            max_depth = QUERY.DEFAULT_MAX_DEPTH_CHAIN
+        if max_paths is None:
+            max_paths = QUERY.MAX_PATHS_LIMIT
+
+        # Validate inputs
+        if max_depth > QUERY.MAX_DEPTH_LIMIT:
+            logger.warning(
+                f"max_depth {max_depth} exceeds limit {QUERY.MAX_DEPTH_LIMIT}, "
+                f"using limit"
+            )
+            max_depth = QUERY.MAX_DEPTH_LIMIT
+
+        if max_paths <= 0:
+            logger.warning(f"max_paths {max_paths} is invalid, using default {QUERY.MAX_PATHS_LIMIT}")
+            max_paths = QUERY.MAX_PATHS_LIMIT
+
+        # Start timing if metrics enabled
+        start_time = time.time() if QUERY.LOG_PERFORMANCE_METRICS else None
+
         if start_node not in self.graph.nodes:
             return []
 
         if end_node is None:
             # Return direct dependencies as single-hop chains
             chains = []
-            deps = self.graph.get_dependencies(start_node)
-            for dep in deps:
+            deps = list(self.graph.get_dependencies(start_node))  # Convert set to list
+            for dep in deps[:max_paths]:  # Limit even for direct deps
                 chain = CallChain(
                     path=[start_node, dep],
                     node_types=[
@@ -113,10 +151,21 @@ class QueryEngine:
                     depth=1
                 )
                 chains.append(chain)
+
+            if QUERY.LOG_PERFORMANCE_METRICS and start_time:
+                elapsed = time.time() - start_time
+                logger.info(
+                    f"Query: {start_node} (direct deps), "
+                    f"found {len(chains)} chains in {elapsed:.3f}s"
+                )
+
             return chains
 
+        # Reset path counter for new search
+        self._path_count = 0
+
         # Find all paths from start to end using DFS
-        paths = self._find_all_paths(start_node, end_node, max_depth)
+        paths = self._find_all_paths(start_node, end_node, max_depth, max_paths)
 
         # Convert paths to CallChain objects
         chains = []
@@ -134,6 +183,19 @@ class QueryEngine:
             )
             chains.append(chain)
 
+        # Log performance metrics
+        if QUERY.LOG_PERFORMANCE_METRICS and start_time:
+            elapsed = time.time() - start_time
+            logger.info(
+                f"Query: {start_node}→{end_node}, "
+                f"found {len(chains)} chains in {elapsed:.3f}s"
+            )
+            if len(chains) >= max_paths:
+                logger.warning(
+                    f"Hit path limit {max_paths}, results may be incomplete. "
+                    f"Consider increasing max_paths or reducing max_depth."
+                )
+
         return chains
 
     def _find_all_paths(
@@ -141,6 +203,7 @@ class QueryEngine:
         start: str,
         end: str,
         max_depth: int,
+        max_paths: int,
         visited: Optional[Set[str]] = None,
         path: Optional[List[str]] = None
     ) -> List[List[str]]:
@@ -151,16 +214,21 @@ class QueryEngine:
             start: Start node
             end: End node
             max_depth: Maximum depth
+            max_paths: Maximum number of paths to find (prevents explosion)
             visited: Set of visited nodes (modified in-place, uses backtracking)
             path: Current path (modified in-place, uses backtracking)
 
         Returns:
-            List of paths
+            List of paths (limited to max_paths)
         """
         if visited is None:
             visited = set()
         if path is None:
             path = []
+
+        # Early exit if we've found enough paths
+        if self._path_count >= max_paths:
+            return []
 
         # Add current node to path and visited set
         visited.add(start)
@@ -168,7 +236,8 @@ class QueryEngine:
 
         # Check if we reached the end
         if start == end:
-            result = [path.copy()]  # Must copy since we'll modify path during backtracking
+            self._path_count += 1
+            result = [path.copy()] if self._path_count <= max_paths else []
         # Check max depth
         elif len(path) > max_depth:
             result = []
@@ -176,9 +245,11 @@ class QueryEngine:
             # Explore dependencies
             paths = []
             for dep in self.graph.get_dependencies(start):
-                if dep not in visited:
+                if dep not in visited and self._path_count < max_paths:
                     # Recurse without copying - backtracking handles cleanup
-                    sub_paths = self._find_all_paths(dep, end, max_depth, visited, path)
+                    sub_paths = self._find_all_paths(
+                        dep, end, max_depth, max_paths, visited, path
+                    )
                     paths.extend(sub_paths)
             result = paths
 
@@ -189,16 +260,30 @@ class QueryEngine:
         return result
 
     def _get_edge_type(self, from_node: str, to_node: str) -> List[str]:
-        """Get edge types between two nodes"""
-        edge_types = []
-        for edge in self.graph.edges:
-            if edge[0] == from_node and edge[1] == to_node:
-                edge_types.append(edge[2])
+        """
+        Get edge types between two nodes (optimized with lookup map)
+
+        Args:
+            from_node: Source node
+            to_node: Target node
+
+        Returns:
+            List of edge types (e.g., ['CALLS', 'DEPENDS_ON'])
+        """
+        # Use optimized lookup map if available (O(1) instead of O(E))
+        if self._edge_map is not None:
+            edge_types = self._edge_map.get((from_node, to_node), [])
+        else:
+            # Fallback to linear search if caching disabled
+            edge_types = []
+            for edge in self.graph.edges:
+                if edge[0] == from_node and edge[1] == to_node:
+                    edge_types.append(edge[2])
 
         if not edge_types:
-            logger.debug(
-                f"No edge type found between '{from_node}' and '{to_node}', "
-                f"using 'unknown' as fallback"
+            logger.warning(
+                f"Missing edge: {from_node} → {to_node} "
+                f"(edge exists in graph but has no type)"
             )
             return ['unknown']
 
@@ -208,7 +293,7 @@ class QueryEngine:
         self,
         node_id: str,
         direction: str = "both",
-        max_depth: int = 5
+        max_depth: int = None
     ) -> Optional[ImpactAnalysisResult]:
         """
         Analyze impact of changing a node
@@ -216,11 +301,25 @@ class QueryEngine:
         Args:
             node_id: Node to analyze
             direction: "upstream", "downstream", or "both"
-            max_depth: Maximum depth to analyze
+            max_depth: Maximum depth to analyze (default: QUERY.DEFAULT_MAX_DEPTH_IMPACT)
 
         Returns:
             ImpactAnalysisResult or None if node doesn't exist
         """
+        # Use default from config if not specified
+        if max_depth is None:
+            max_depth = QUERY.DEFAULT_MAX_DEPTH_IMPACT
+
+        # Validate input
+        if max_depth > QUERY.MAX_DEPTH_LIMIT:
+            logger.warning(
+                f"max_depth {max_depth} exceeds limit {QUERY.MAX_DEPTH_LIMIT}, using limit"
+            )
+            max_depth = QUERY.MAX_DEPTH_LIMIT
+
+        # Start timing if metrics enabled
+        start_time = time.time() if QUERY.LOG_PERFORMANCE_METRICS else None
+
         if node_id not in self.graph.nodes:
             return None
 
@@ -235,6 +334,14 @@ class QueryEngine:
 
         total_upstream = sum(len(nodes) for nodes in upstream.values())
         total_downstream = sum(len(nodes) for nodes in downstream.values())
+
+        # Log performance metrics
+        if QUERY.LOG_PERFORMANCE_METRICS and start_time:
+            elapsed = time.time() - start_time
+            logger.info(
+                f"Impact analysis: {node_id} ({direction}), "
+                f"found {total_upstream + total_downstream} affected nodes in {elapsed:.3f}s"
+            )
 
         return ImpactAnalysisResult(
             target_node=node_id,

@@ -13,9 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base_command import BaseCommand, validate_args
-
-# Constants
-MAX_SUGGESTED_NODES = 10
+from ..config import QUERY
 
 
 class ImpactAnalysisCommand(BaseCommand):
@@ -67,8 +65,8 @@ Examples:
         parser.add_argument(
             '--max-depth', '-m',
             type=int,
-            default=5,
-            help='Maximum depth to analyze (default: 5)'
+            default=QUERY.DEFAULT_MAX_DEPTH_IMPACT,
+            help=f'Maximum depth to analyze (default: {QUERY.DEFAULT_MAX_DEPTH_IMPACT}, max: {QUERY.MAX_DEPTH_LIMIT})'
         )
 
         parser.add_argument(
@@ -90,6 +88,12 @@ Examples:
     async def execute(self, args: List[str]) -> Dict[str, Any]:
         """Execute /impact-analysis command"""
         parsed_args = self.parse_args(args)
+
+        # Validate max_depth
+        if parsed_args.max_depth > QUERY.MAX_DEPTH_LIMIT:
+            return self.format_error(
+                f"max_depth {parsed_args.max_depth} exceeds limit {QUERY.MAX_DEPTH_LIMIT}"
+            )
 
         # Load dependency graph from cache or analyze project
         from mcp_server.tools.graph_utils import load_or_build_graph
@@ -117,8 +121,8 @@ Examples:
 
         # Check if node exists
         if result is None:
-            available_nodes = list(graph.nodes.keys())[:MAX_SUGGESTED_NODES]
-            suggestion = f"Available nodes (first {MAX_SUGGESTED_NODES}): {', '.join(available_nodes)}"
+            available_nodes = list(graph.nodes.keys())[:QUERY.MAX_SUGGESTED_NODES]
+            suggestion = f"Available nodes (first {QUERY.MAX_SUGGESTED_NODES}): {', '.join(available_nodes)}"
             return self.format_error(f"Node '{parsed_args.node}' not found in graph. {suggestion}")
 
         # Format output

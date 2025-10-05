@@ -31,7 +31,9 @@ try:
     from mcp.types import Tool, TextContent
     MCP_AVAILABLE = True
 except ImportError:
-    print("⚠️  MCP SDK not fully available, running in stub mode", file=sys.stderr)
+    # Only show warning if not in test mode
+    if 'pytest' not in sys.modules and 'unittest' not in sys.modules:
+        print("⚠️  MCP SDK not fully available, running in stub mode", file=sys.stderr)
     MCP_AVAILABLE = False
 
 # Import analysis tools (Phase 1 & 2)
@@ -268,6 +270,78 @@ class SpringMVCMCPServer:
                 "required": ["interface_file"]
             },
             handler=self._handle_analyze_mybatis
+        )
+
+        # Tool 7: Find Call Chain (Phase 4.4)
+        self.register_tool(
+            name="find_chain",
+            description="Find call chains from start node to end node in dependency graph",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "start_node": {
+                        "type": "string",
+                        "description": "Starting node name (e.g., UserController)"
+                    },
+                    "end_node": {
+                        "type": "string",
+                        "description": "Ending node name (optional, shows direct dependencies if not provided)"
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum depth to search",
+                        "default": 10
+                    },
+                    "project_path": {
+                        "type": "string",
+                        "description": "Project root directory (default: current project)"
+                    },
+                    "cache_dir": {
+                        "type": "string",
+                        "description": "Cache directory for loading previous analysis",
+                        "default": ".batch_cache"
+                    }
+                },
+                "required": ["start_node"]
+            },
+            handler=self._handle_find_chain
+        )
+
+        # Tool 8: Impact Analysis (Phase 4.4)
+        self.register_tool(
+            name="impact_analysis",
+            description="Analyze impact of changing a component (shows upstream and downstream dependencies)",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "node": {
+                        "type": "string",
+                        "description": "Node to analyze (e.g., UserService)"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "Analysis direction",
+                        "enum": ["upstream", "downstream", "both"],
+                        "default": "both"
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum depth to analyze",
+                        "default": 5
+                    },
+                    "project_path": {
+                        "type": "string",
+                        "description": "Project root directory (default: current project)"
+                    },
+                    "cache_dir": {
+                        "type": "string",
+                        "description": "Cache directory for loading previous analysis",
+                        "default": ".batch_cache"
+                    }
+                },
+                "required": ["node"]
+            },
+            handler=self._handle_impact_analysis
         )
 
         print(f"✓ Registered {len(self.tools)} MCP Tools", file=sys.stderr)
@@ -565,6 +639,110 @@ class SpringMVCMCPServer:
 
         except Exception as e:
             return {"success": False, "error": f"MyBatis analysis failed: {str(e)}"}
+
+    async def _handle_find_chain(self, **kwargs) -> Dict[str, Any]:
+        """Handle find_chain tool call (Phase 4.4)"""
+        start_node = kwargs.get("start_node")
+        end_node = kwargs.get("end_node")
+        max_depth = kwargs.get("max_depth", 10)
+        project_path = kwargs.get("project_path", str(self.project_root))
+        cache_dir = kwargs.get("cache_dir", ".batch_cache")
+
+        if not start_node:
+            return {"success": False, "error": "start_node is required"}
+
+        try:
+            from mcp_server.tools.graph_utils import load_or_build_graph
+            from mcp_server.tools.query_engine import QueryEngine
+
+            # Load dependency graph
+            graph = await load_or_build_graph(project_path, cache_dir)
+
+            # Execute query
+            query_engine = QueryEngine(graph)
+            chains = query_engine.find_call_chains(
+                start_node=start_node,
+                end_node=end_node,
+                max_depth=max_depth
+            )
+
+            # Format result
+            if not chains:
+                if end_node:
+                    message = f"No call chains found from {start_node} to {end_node}"
+                else:
+                    message = f"No dependencies found for {start_node}"
+
+                return {
+                    "success": True,
+                    "message": message,
+                    "chains": [],
+                    "count": 0
+                }
+
+            return {
+                "success": True,
+                "message": f"✓ Found {len(chains)} call chain(s)",
+                "chains": [chain.to_dict() for chain in chains],
+                "count": len(chains),
+                "start_node": start_node,
+                "end_node": end_node
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Find chain failed: {str(e)}"}
+
+    async def _handle_impact_analysis(self, **kwargs) -> Dict[str, Any]:
+        """Handle impact_analysis tool call (Phase 4.4)"""
+        node = kwargs.get("node")
+        direction = kwargs.get("direction", "both")
+        max_depth = kwargs.get("max_depth", 5)
+        project_path = kwargs.get("project_path", str(self.project_root))
+        cache_dir = kwargs.get("cache_dir", ".batch_cache")
+
+        if not node:
+            return {"success": False, "error": "node is required"}
+
+        try:
+            from mcp_server.tools.graph_utils import load_or_build_graph
+            from mcp_server.tools.query_engine import QueryEngine
+
+            # Load dependency graph
+            graph = await load_or_build_graph(project_path, cache_dir)
+
+            # Execute query
+            query_engine = QueryEngine(graph)
+            result = query_engine.impact_analysis(
+                node_id=node,
+                direction=direction,
+                max_depth=max_depth
+            )
+
+            # Handle None result (node not found)
+            if result is None:
+                return {
+                    "success": False,
+                    "error": f"Node '{node}' not found in dependency graph"
+                }
+
+            # Filter by direction if specified
+            if direction == "upstream":
+                total = result.total_upstream
+            elif direction == "downstream":
+                total = result.total_downstream
+            else:
+                total = result.total_upstream + result.total_downstream
+
+            return {
+                "success": True,
+                "message": f"✓ Impact analysis complete: {total} affected component(s)",
+                "result": result.to_dict(),
+                "direction": direction,
+                "total_affected": total
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Impact analysis failed: {str(e)}"}
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """

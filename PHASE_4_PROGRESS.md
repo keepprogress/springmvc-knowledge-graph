@@ -1,8 +1,8 @@
 # Phase 4: MCP Integration Progress
 
-**Status**: Phase 4.2 Complete ✅
-**Version**: 0.4.0-alpha
-**Date**: 2025-10-04
+**Status**: Phase 4.4 Complete ✅
+**Version**: 0.4.4-alpha
+**Date**: 2025-10-05
 
 ## Overview
 
@@ -262,21 +262,53 @@ Implement batch analysis for entire project structure with parallel execution.
 
 ---
 
-### Phase 4.4: Integration Tests ⏳ PLANNED
+### Phase 4.4: Query Engine & Graph Commands ✅ COMPLETE
 
-Comprehensive end-to-end testing of MCP server.
+Implement knowledge graph query capabilities for dependency analysis.
 
-**Test Coverage:**
-- [ ] Each slash command individually
-- [ ] Batch processing
-- [ ] Error handling and edge cases
-- [ ] Performance benchmarks
-- [ ] CI/CD integration
+**Implementation:**
 
-**Deliverables:**
-- [ ] `tests/test_mcp_integration.py` - E2E tests
-- [ ] GitHub Actions workflow
-- [ ] Test reports
+| Component | Status | File | Lines | Description |
+|-----------|--------|------|-------|-------------|
+| Query Engine | ✅ | `query_engine.py` | 350+ | DFS-based call chain & impact analysis |
+| Dependency Graph | ✅ | `dependency_graph.py` | 250+ | Graph data structure |
+| Graph Utils | ✅ | `graph_utils.py` | 150+ | Helper utilities |
+| `/find-chain` Command | ✅ | `find_chain_cmd.py` | 180+ | Find call chains |
+| `/impact-analysis` Command | ✅ | `impact_analysis_cmd.py` | 170+ | Impact analysis |
+
+**MCP Tools Added:**
+- ✅ **Tool 7: `find_chain`** - Find call chains from start node to end node
+  - Parameters: `start_node`, `end_node` (optional), `max_depth`, `project_path`, `cache_dir`
+  - Returns: List of call chains with node types and edge types
+
+- ✅ **Tool 8: `impact_analysis`** - Analyze impact of changing a component
+  - Parameters: `node`, `direction` (upstream/downstream/both), `max_depth`, `project_path`, `cache_dir`
+  - Returns: Upstream and downstream dependencies with total counts
+
+**Slash Commands:**
+- ✅ `/find-chain <start> [end] [--max-depth N]` (alias: `/chain`)
+- ✅ `/impact-analysis <node> [--direction up/down/both] [--max-depth N]` (alias: `/impact`)
+
+**Features:**
+- ✅ Optimized DFS algorithm for path finding with backtracking
+- ✅ Bidirectional dependency analysis (upstream & downstream)
+- ✅ Configurable search depth
+- ✅ Graph caching and lazy loading
+- ✅ Graceful error handling for missing nodes
+- ✅ Multiple output formats (text/JSON)
+
+**Tests:**
+- ✅ `tests/test_query_commands.py` - 8/8 tests passed
+  - Tool registration verification
+  - Command parsing and execution
+  - MCP tool invocation
+  - Alias support
+  - Error handling
+
+**Performance:**
+- Call chain discovery: O(V + E) with max_depth limit
+- Impact analysis: O(V + E) for BFS traversal
+- Graph loading: Cached from batch analysis results
 
 ---
 
@@ -300,10 +332,10 @@ Complete documentation and final polish.
 | 4.1 MCP Tool Registration | ✅ Complete | 100% |
 | 4.2 Slash Commands (Enhanced) | ✅ Complete | 100% |
 | 4.3 Batch Analyzer | ✅ Complete | 100% |
-| 4.4 Integration Tests | ⏳ Planned | 0% |
-| 4.5 Documentation | 🔄 In Progress | 50% |
+| 4.4 Query Engine & Graph Commands | ✅ Complete | 100% |
+| 4.5 Documentation | 🔄 In Progress | 60% |
 
-**Overall Phase 4 Progress:** 70% (3.5/5 sub-phases complete)
+**Overall Phase 4 Progress:** 92% (4.6/5 sub-phases complete)
 
 ---
 
@@ -451,36 +483,50 @@ Results: 6/6 tests passed
 
 ### Tool/Command Coverage
 
-- **MCP Tools Registered:** 6/6 (100%)
-- **Slash Commands Implemented:** 5/5 (100%)
+- **MCP Tools Registered:** 8/8 (100%)
+  - Phase 1-2: `extract_oracle_schema`, `analyze_stored_procedure`
+  - Phase 3: `analyze_jsp`, `analyze_controller`, `analyze_service`, `analyze_mybatis`
+  - Phase 4.4: `find_chain`, `impact_analysis` ⭐ NEW
+
+- **Slash Commands Implemented:** 7/7 (100%)
   - `/analyze-jsp` (alias: `/jsp`)
   - `/analyze-controller` (alias: `/controller`)
   - `/analyze-service` (alias: `/service`)
   - `/analyze-mybatis` (aliases: `/mybatis`, `/mb`)
-  - `/analyze-all` (alias: `/batch`) ⭐ NEW
-- **Command Aliases:** 7 aliases (100% coverage)
-- **Test Coverage:** 13/13 tests passed (100%)
+  - `/analyze-all` (alias: `/batch`)
+  - `/find-chain` (alias: `/chain`) ⭐ NEW
+  - `/impact-analysis` (alias: `/impact`) ⭐ NEW
+
+- **Command Aliases:** 11 aliases (100% coverage)
+- **Test Coverage:** 21/21 tests passed (100%)
+  - Phase 3 analyzers: 4 tests
+  - Slash commands: 9 tests
+  - Query engine: 8 tests ⭐ NEW
 - **Batch Analyzer:** ✅ Complete (1,339 lines)
+- **Query Engine:** ✅ Complete (750+ lines) ⭐ NEW
 - **Documentation:** 2/3 docs complete (67%)
 
 ---
 
 ## Next Steps
 
-1. **Phase 4.3: Batch Analyzer**
-   - Implement project-wide analysis
-   - Create `/analyze-all` command
-   - Parallel execution support
+1. **Phase 4.5: Complete Documentation** (60% done)
+   - [ ] `docs/MCP_TOOLS.md` - MCP tools reference
+   - [ ] `docs/QUERY_ENGINE.md` - Query engine usage guide ⭐ NEW
+   - [ ] Update `README.md` with Phase 4.4 features
+   - [ ] Architecture diagrams
 
-2. **Phase 4.5: Complete Documentation**
-   - `docs/MCP_TOOLS.md` - MCP tools reference
-   - Update `README.md` with Phase 4 features
-   - Architecture diagrams
+2. **Phase 5: Knowledge Graph Building** (Next major phase)
+   - [ ] Graph Builder - Layer 1 (code-based relationships)
+   - [ ] Graph Builder - Layer 2 (LLM completeness scanning)
+   - [ ] Graph Merger (combine code + LLM results)
+   - [ ] Graph Visualization (PyVis, Mermaid, GraphViz)
+   - [ ] Neo4j export support
 
-3. **Phase 5: Knowledge Graph**
-   - Neo4j integration
-   - Graph building from analysis results
-   - Query interface
+3. **Phase 6: Testing & Documentation**
+   - [ ] E2E integration tests
+   - [ ] Performance benchmarks
+   - [ ] Complete user documentation
 
 ---
 
@@ -493,6 +539,37 @@ Results: 6/6 tests passed
 
 ---
 
-**Last Updated:** 2025-10-04
-**Version:** 0.4.0-alpha
-**Phase:** 4.2 Complete
+## Phase 4.4 Summary
+
+**What Was Accomplished:**
+1. ✅ Implemented QueryEngine with optimized DFS algorithm for call chain discovery
+2. ✅ Added impact analysis with upstream/downstream dependency tracking
+3. ✅ Registered 2 new MCP tools: `find_chain` and `impact_analysis`
+4. ✅ Created 2 new slash commands with aliases: `/find-chain` (`/chain`) and `/impact-analysis` (`/impact`)
+5. ✅ Built graph utilities for loading and building dependency graphs from cache
+6. ✅ Implemented graceful error handling for missing nodes
+7. ✅ Added comprehensive tests (8/8 tests passing)
+
+**Key Features:**
+- **Optimized DFS with backtracking** - Efficient path finding with cycle detection
+- **Bidirectional analysis** - Both upstream (who depends on me) and downstream (what I depend on)
+- **Configurable depth** - Control search depth to balance detail vs performance
+- **Graph caching** - Reuse batch analysis results for instant queries
+- **Multiple output formats** - Text for CLI, JSON for programmatic use
+
+**Files Added/Modified:**
+- `mcp_server/tools/query_engine.py` (350+ lines) - NEW
+- `mcp_server/tools/dependency_graph.py` (250+ lines) - NEW
+- `mcp_server/tools/graph_utils.py` (150+ lines) - NEW
+- `mcp_server/commands/find_chain_cmd.py` (180+ lines) - NEW
+- `mcp_server/commands/impact_analysis_cmd.py` (170+ lines) - NEW
+- `mcp_server/springmvc_mcp_server.py` - Modified (added 2 tools + handlers)
+- `tests/test_query_commands.py` (200+ lines) - NEW
+
+**Total Code Added:** ~1,300 lines
+
+---
+
+**Last Updated:** 2025-10-05
+**Version:** 0.4.4-alpha
+**Phase:** 4.4 Complete

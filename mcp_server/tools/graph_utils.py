@@ -14,9 +14,7 @@ from typing import Optional
 
 from .dependency_graph import DependencyGraph
 from .batch_analyzer import BatchAnalyzer
-
-# Constants
-CACHE_MAX_AGE_HOURS = 24
+from ..config import CACHE, ANALYZER
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +38,45 @@ async def load_or_build_graph(
     Raises:
         Exception: If failed to build dependency graph
     """
-    cache_path = Path(cache_dir) / "batch_analysis.json"
+    # First check for direct dependency_graph.json (simpler format, used in tests)
+    direct_graph_path = Path(cache_dir) / "dependency_graph.json"
+    if direct_graph_path.exists():
+        try:
+            with open(direct_graph_path, 'r', encoding='utf-8') as f:
+                graph_data = json.load(f)
 
-    # Try to load from cache first
+            # Reconstruct graph from JSON
+            graph = DependencyGraph()
+
+            # Add nodes
+            nodes_data = graph_data.get('nodes', {})
+            if isinstance(nodes_data, dict):
+                # Format: {"NodeName": {"type": "...", ...}}
+                for node_name, node_info in nodes_data.items():
+                    graph.add_node(node_name, node_info.get('type', 'unknown'))
+            elif isinstance(nodes_data, list):
+                # Format: [{"name": "...", "type": "..."}]
+                for node_data in nodes_data:
+                    graph.add_node(node_data['name'], node_data['type'])
+
+            # Add edges
+            edges_data = graph_data.get('edges', [])
+            for edge in edges_data:
+                if isinstance(edge, list):
+                    # Format: ["from", "to", "type"]
+                    graph.add_edge(edge[0], edge[1], edge[2] if len(edge) > 2 else 'uses')
+                elif isinstance(edge, dict):
+                    # Format: {"from": "...", "to": "...", "type": "..."}
+                    graph.add_edge(edge['from'], edge['to'], edge.get('type', 'uses'))
+
+            logger.info(f"Loaded dependency graph directly from {direct_graph_path}")
+            return graph
+        except Exception as e:
+            logger.warning(f"Failed to load direct graph file: {e}, trying batch cache")
+            # Fall through to try batch_analysis.json
+
+    # Try to load from batch cache
+    cache_path = Path(cache_dir) / "batch_analysis.json"
     if cache_path.exists():
         try:
             with open(cache_path, 'r', encoding='utf-8') as f:
@@ -52,12 +86,12 @@ async def load_or_build_graph(
             cache_version = cached_data.get('version', '0.0.0')
             cache_timestamp = cached_data.get('timestamp')
 
-            # Check if cache is recent (within CACHE_MAX_AGE_HOURS)
+            # Check if cache is recent (within CACHE.CACHE_MAX_AGE_HOURS)
             current_time = time.time()
             cache_age_hours = (current_time - cache_timestamp) / 3600 if cache_timestamp else float('inf')
 
-            if cache_age_hours > CACHE_MAX_AGE_HOURS:
-                logger.info(f"Cache is {cache_age_hours:.1f} hours old (max: {CACHE_MAX_AGE_HOURS}), rebuilding graph")
+            if cache_age_hours > CACHE.CACHE_MAX_AGE_HOURS:
+                logger.info(f"Cache is {cache_age_hours:.1f} hours old (max: {CACHE.CACHE_MAX_AGE_HOURS}), rebuilding graph")
                 # Fall through to build new graph
             elif 'dependency_graph' in cached_data:
                 graph_data = cached_data['dependency_graph']
@@ -97,8 +131,8 @@ async def load_or_build_graph(
     batch = BatchAnalyzer(
         project_root=project_dir,
         analyzers=analyzers,
-        max_workers=10,
-        use_cache=True,
+        max_workers=ANALYZER.DEFAULT_MAX_WORKERS,
+        use_cache=CACHE.USE_CACHE,
         cache_dir=cache_dir,
         show_progress=show_progress
     )

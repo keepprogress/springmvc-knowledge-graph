@@ -13,9 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base_command import BaseCommand, validate_args
-
-# Constants
-MAX_SUGGESTED_NODES = 10
+from ..config import QUERY
 
 
 class FindChainCommand(BaseCommand):
@@ -74,8 +72,15 @@ Examples:
         parser.add_argument(
             '--max-depth', '-d',
             type=int,
-            default=10,
-            help='Maximum depth to search (default: 10)'
+            default=QUERY.DEFAULT_MAX_DEPTH_CHAIN,
+            help=f'Maximum depth to search (default: {QUERY.DEFAULT_MAX_DEPTH_CHAIN}, max: {QUERY.MAX_DEPTH_LIMIT})'
+        )
+
+        parser.add_argument(
+            '--max-paths',
+            type=int,
+            default=QUERY.MAX_PATHS_LIMIT,
+            help=f'Maximum number of paths to return (default: {QUERY.MAX_PATHS_LIMIT})'
         )
 
         parser.add_argument(
@@ -105,6 +110,16 @@ Examples:
         if not start_node:
             return self.format_error("Start node is required. Usage: /find-chain <start_node> [end_node]")
 
+        # Validate max_depth
+        if parsed_args.max_depth > QUERY.MAX_DEPTH_LIMIT:
+            return self.format_error(
+                f"max_depth {parsed_args.max_depth} exceeds limit {QUERY.MAX_DEPTH_LIMIT}"
+            )
+
+        # Validate max_paths
+        if parsed_args.max_paths <= 0:
+            return self.format_error("max_paths must be greater than 0")
+
         # Load dependency graph from cache or analyze project
         from mcp_server.tools.graph_utils import load_or_build_graph
 
@@ -124,15 +139,16 @@ Examples:
             chains = engine.find_call_chains(
                 start_node=start_node,
                 end_node=end_node,
-                max_depth=parsed_args.max_depth
+                max_depth=parsed_args.max_depth,
+                max_paths=parsed_args.max_paths
             )
         except Exception as e:
             return self.format_error(f"Failed to find call chains: {str(e)}")
 
         # Check if node exists
         if start_node not in graph.nodes:
-            available_nodes = list(graph.nodes.keys())[:MAX_SUGGESTED_NODES]
-            suggestion = f"Available nodes (first {MAX_SUGGESTED_NODES}): {', '.join(available_nodes)}"
+            available_nodes = list(graph.nodes.keys())[:QUERY.MAX_SUGGESTED_NODES]
+            suggestion = f"Available nodes (first {QUERY.MAX_SUGGESTED_NODES}): {', '.join(available_nodes)}"
             return self.format_error(f"Start node '{start_node}' not found in graph. {suggestion}")
 
         # Format output
