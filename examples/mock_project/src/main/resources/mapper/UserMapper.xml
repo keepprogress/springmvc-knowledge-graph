@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <!-- Result Map -->
+    <resultMap id="UserResultMap" type="com.example.model.User">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="email" property="email"/>
+        <result column="status" property="status"/>
+        <result column="points" property="points"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- Select user list with pagination -->
+    <select id="selectUserList" resultMap="UserResultMap">
+        SELECT id, username, email, status, points, create_time, update_time
+        FROM users
+        WHERE deleted = 0
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- Count total users -->
+    <select id="countUsers" resultType="int">
+        SELECT COUNT(*)
+        FROM users
+        WHERE deleted = 0
+    </select>
+
+    <!-- Search users -->
+    <select id="searchUsers" resultMap="UserResultMap">
+        SELECT id, username, email, status, points, create_time, update_time
+        FROM users
+        WHERE deleted = 0
+        <if test="username != null and username != ''">
+            AND username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="email != null and email != ''">
+            AND email LIKE CONCAT('%', #{email}, '%')
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- Select user by ID -->
+    <select id="selectUserById" resultMap="UserResultMap">
+        SELECT id, username, email, status, points, create_time, update_time
+        FROM users
+        WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <!-- Insert new user -->
+    <insert id="insertUser" parameterType="com.example.model.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (username, email, status, points, create_time, update_time, deleted)
+        VALUES (#{username}, #{email}, #{status}, 0, #{createTime}, #{updateTime}, 0)
+    </insert>
+
+    <!-- Update user -->
+    <update id="updateUser" parameterType="com.example.model.User">
+        UPDATE users
+        SET username = #{username},
+            email = #{email},
+            status = #{status},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Delete user (soft delete) -->
+    <update id="deleteUser">
+        UPDATE users
+        SET deleted = 1, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Batch delete users -->
+    <update id="batchDeleteUsers">
+        UPDATE users
+        SET deleted = 1, update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- Count users by username -->
+    <select id="countByUsername" resultType="int">
+        SELECT COUNT(*)
+        FROM users
+        WHERE username = #{username} AND deleted = 0
+    </select>
+
+    <!-- Update user status -->
+    <update id="updateUserStatus">
+        UPDATE users
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- Update user points -->
+    <update id="updateUserPoints">
+        UPDATE users
+        SET points = points + #{amount}, update_time = NOW()
+        WHERE id = #{userId}
+    </update>
+
+    <!-- Call stored procedure to sync user data -->
+    <select id="callSyncUserDataProcedure" statementType="CALLABLE">
+        {CALL SYNC_USER_DATA(#{userId, mode=IN, jdbcType=NUMERIC})}
+    </select>
+
+</mapper>

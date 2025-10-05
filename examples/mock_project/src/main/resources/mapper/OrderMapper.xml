@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.OrderMapper">
+
+    <!-- Result Map -->
+    <resultMap id="OrderResultMap" type="com.example.model.Order">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="customer_name" property="customerName"/>
+        <result column="total_amount" property="totalAmount"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- Select all orders -->
+    <select id="selectAllOrders" resultMap="OrderResultMap">
+        SELECT o.id, o.order_no, o.user_id, u.username as customer_name,
+               o.total_amount, o.status, o.create_time, o.update_time
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.deleted = 0
+        ORDER BY o.create_time DESC
+    </select>
+
+    <!-- Filter orders -->
+    <select id="filterOrders" resultMap="OrderResultMap">
+        SELECT o.id, o.order_no, o.user_id, u.username as customer_name,
+               o.total_amount, o.status, o.create_time, o.update_time
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.deleted = 0
+        <if test="status != null and status != ''">
+            AND o.status = #{status}
+        </if>
+        <if test="startDate != null">
+            AND o.create_time &gt;= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND o.create_time &lt;= #{endDate}
+        </if>
+        ORDER BY o.create_time DESC
+    </select>
+
+    <!-- Select order by order number -->
+    <select id="selectOrderByNo" resultMap="OrderResultMap">
+        SELECT o.id, o.order_no, o.user_id, u.username as customer_name,
+               o.total_amount, o.status, o.create_time, o.update_time
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.order_no = #{orderNo} AND o.deleted = 0
+    </select>
+
+    <!-- Insert new order -->
+    <insert id="insertOrder" parameterType="com.example.model.Order" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO orders (order_no, user_id, total_amount, status, create_time, update_time, deleted)
+        VALUES (#{orderNo}, #{userId}, #{totalAmount}, #{status}, #{createTime}, NOW(), 0)
+    </insert>
+
+    <!-- Insert order item -->
+    <insert id="insertOrderItem">
+        INSERT INTO order_items (order_no, product_id, product_name, quantity, price, create_time)
+        VALUES (
+            #{orderNo},
+            #{item.productId},
+            #{item.productName},
+            #{item.quantity},
+            #{item.price},
+            NOW()
+        )
+    </insert>
+
+    <!-- Update order status -->
+    <update id="updateOrderStatus">
+        UPDATE orders
+        SET status = #{status}, update_time = NOW()
+        WHERE order_no = #{orderNo}
+    </update>
+
+    <!-- Select orders by user ID -->
+    <select id="selectOrdersByUserId" resultMap="OrderResultMap">
+        SELECT id, order_no, user_id, total_amount, status, create_time, update_time
+        FROM orders
+        WHERE user_id = #{userId} AND deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- Calculate order statistics -->
+    <select id="calculateOrderStatistics" resultType="map">
+        SELECT
+            COUNT(*) as totalOrders,
+            SUM(total_amount) as totalAmount,
+            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completedOrders,
+            SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pendingOrders,
+            SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelledOrders
+        FROM orders
+        WHERE deleted = 0
+        <if test="startDate != null">
+            AND create_time &gt;= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND create_time &lt;= #{endDate}
+        </if>
+    </select>
+
+    <!-- Call stored procedure to calculate order -->
+    <select id="callCalculateOrderProcedure" statementType="CALLABLE">
+        {CALL CALCULATE_ORDER_AMOUNT(#{orderNo, mode=IN, jdbcType=VARCHAR})}
+    </select>
+
+</mapper>
