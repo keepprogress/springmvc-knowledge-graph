@@ -80,6 +80,29 @@ class Node:
             "metadata": self.metadata
         }
 
+    def __eq__(self, other) -> bool:
+        """
+        Check equality based on node ID.
+
+        Args:
+            other: Another object to compare
+
+        Returns:
+            True if both are Node objects with same ID
+        """
+        if not isinstance(other, Node):
+            return False
+        return self.id == other.id
+
+    def __hash__(self) -> int:
+        """
+        Hash based on node ID for use in sets and dicts.
+
+        Returns:
+            Hash of node ID
+        """
+        return hash(self.id)
+
     def __repr__(self) -> str:
         return f"Node(id='{self.id}', type='{self.type}', name='{self.name}')"
 
@@ -401,6 +424,69 @@ class NodeBuilder:
         logger.info(f"Created {len(nodes)} Mapper nodes (including methods)")
         return nodes
 
+    def _is_callable_statement(self, sql: str, stmt: Dict) -> bool:
+        """
+        Check if SQL statement is a stored procedure call.
+
+        Args:
+            sql: SQL statement text
+            stmt: Statement dictionary with metadata
+
+        Returns:
+            True if this is a callable statement
+        """
+        if not sql:
+            return False
+
+        # Check for CALL keyword in SQL
+        sql_upper = sql.upper().strip()
+        if "CALL " in sql_upper or sql_upper.startswith("{CALL"):
+            return True
+
+        # Check statementType attribute (MyBatis specific)
+        if stmt.get("statementType") == "CALLABLE":
+            return True
+
+        # Check for common procedure call patterns
+        if sql_upper.startswith("EXEC ") or sql_upper.startswith("EXECUTE "):
+            return True
+
+        return False
+
+    def _extract_procedure_name(self, sql: str) -> Optional[str]:
+        """
+        Extract procedure name from callable SQL statement.
+
+        Args:
+            sql: SQL statement text
+
+        Returns:
+            Procedure name or None if not found
+        """
+        import re
+
+        if not sql:
+            return None
+
+        # Pattern 1: {CALL procedure_name(...)}
+        match = re.search(r'\{?\s*CALL\s+(\w+)', sql, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        # Pattern 2: EXEC procedure_name ...
+        match = re.search(r'EXEC(?:UTE)?\s+(\w+)', sql, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        # Pattern 3: Schema.procedure_name
+        match = re.search(r'\{?\s*CALL\s+(\w+\.\w+)', sql, re.IGNORECASE)
+        if match:
+            # Return just the procedure name without schema
+            parts = match.group(1).split('.')
+            return parts[-1]
+
+        return None
+
     def create_sql_nodes(self) -> List[Node]:
         """
         Create SQL statement nodes from MyBatis Mapper XML.
@@ -424,6 +510,15 @@ class NodeBuilder:
                 if node_id in self.node_ids:
                     continue
 
+                # Check if this is a callable statement (stored procedure call)
+                sql = stmt.get("sql", "")
+                is_callable = self._is_callable_statement(sql, stmt)
+
+                # Extract procedure name if callable
+                procedure_name = None
+                if is_callable:
+                    procedure_name = self._extract_procedure_name(sql)
+
                 # Metadata
                 metadata = {
                     "sql_type": stmt_type,
@@ -433,7 +528,9 @@ class NodeBuilder:
                     "parameters": stmt.get("parameters", []),
                     "tables": stmt.get("tables", []),
                     "dynamic_sql": stmt.get("dynamic_sql", False),
-                    "sql": stmt.get("sql", "")[:200]  # First 200 chars for preview
+                    "sql": stmt.get("sql", "")[:200],  # First 200 chars for preview
+                    "is_callable": is_callable,
+                    "procedure_name": procedure_name
                 }
 
                 node = Node(

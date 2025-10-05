@@ -256,7 +256,28 @@ class GraphDataLoader:
 
         if not has_data:
             logger.error("No analysis data loaded - cannot build graph")
+            self.validation_issues.append("No analysis files found")
             return False
+
+        # Validate we have core SpringMVC components
+        if len(self.data["controllers"]) == 0 and len(self.data["services"]) == 0:
+            logger.warning("No controllers or services found - graph may be incomplete")
+            self.validation_issues.append(
+                "Warning: No controllers or services found - this may not be a SpringMVC project"
+            )
+
+        # Check for orphaned components
+        if len(self.data["jsp"]) > 0 and len(self.data["controllers"]) == 0:
+            logger.warning("Found JSP files but no controllers - front-end may be orphaned")
+            self.validation_issues.append(
+                "Warning: JSP files found but no controllers - check if project structure is correct"
+            )
+
+        if len(self.data["services"]) > 0 and len(self.data["mappers"]) == 0:
+            logger.warning("Found services but no mappers - data access layer may be missing")
+            self.validation_issues.append(
+                "Warning: Services found but no mappers - check if MyBatis configuration is correct"
+            )
 
         # Validate individual components
         self._validate_jsp_data()
