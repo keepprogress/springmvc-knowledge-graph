@@ -1,14 +1,15 @@
 # Phase 5: Knowledge Graph Building Progress
 
-**Status**: Phase 5.1.2 Complete ✅
+**Status**: Phase 5.1 Complete ✅, Phase 5.4 In Progress 🔄
 **Version**: 0.5.0-alpha
 **Date**: 2025-10-05
 
 ## Overview
 
 Phase 5 focuses on building a comprehensive knowledge graph from all Phase 3 analysis results using a hybrid two-layer approach:
-- **Layer 1**: Code-based analysis (100% certain relationships)
-- **Layer 2**: LLM-verified gap filling (high-confidence inferences)
+- **Layer 1**: Code-based analysis (100% certain relationships) ✅ **COMPLETE**
+- **Layer 2**: LLM-verified gap filling (high-confidence inferences) - Deferred
+- **Visualization**: Interactive and diagram exports 🔄 **IN PROGRESS**
 
 ## Architecture
 
@@ -16,17 +17,17 @@ Phase 5 focuses on building a comprehensive knowledge graph from all Phase 3 ana
 ┌─────────────────────────────────────────────────────────┐
 │              Phase 5: Knowledge Graph Builder           │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 1: Code-Based (Parser-First)                     │
+│  Layer 1: Code-Based (Parser-First) ✅ COMPLETE         │
 │  ✓ GraphDataLoader    ✓ GraphNodeBuilder               │
-│  [ ] GraphEdgeBuilder  [ ] NetworkX Graph Constructor   │
+│  ✓ GraphEdgeBuilder   ✓ NetworkX Graph Constructor     │
+├─────────────────────────────────────────────────────────┤
+│  Visualization 🔄 IN PROGRESS                            │
+│  [ ] PyVis HTML       [ ] Mermaid Diagrams              │
+│  [ ] GraphViz Export                                     │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 2: LLM-Verified Gap Filling (Future)             │
 │  [ ] Gap Detector      [ ] LLM Verifier                 │
 │  [ ] Confidence Scorer [ ] Graph Merger                 │
-├─────────────────────────────────────────────────────────┤
-│  Output                                                  │
-│  [ ] Graph Exporter    [ ] Visualization                │
-│  [ ] Neo4j Support     [ ] Query API                    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -34,7 +35,7 @@ Phase 5 focuses on building a comprehensive knowledge graph from all Phase 3 ana
 
 ## Phase Breakdown
 
-### Phase 5.1: Graph Builder - Layer 1 (Code-based) 🔄 IN PROGRESS
+### Phase 5.1: Graph Builder - Layer 1 (Code-based) ✅ COMPLETE
 
 Build knowledge graph from code analysis results with 100% certainty.
 
@@ -50,74 +51,13 @@ Build knowledge graph from code analysis results with 100% certainty.
 | Test Suite | ✅ | `test_graph_data_loader.py` | 145 | Comprehensive tests |
 | Code Review | ✅ | `PHASE_5_1_1_REVIEW.md` | 297 | Review & recommendations |
 
-**Features Implemented:**
+**Key Features**:
 - ✅ Load all Phase 3 analysis results (JSP, Controller, Service, Mapper)
 - ✅ Support optional files (DB schema, procedures)
 - ✅ Comprehensive validation with detailed error reporting
-- ✅ Graceful error handling (continue on failures)
-- ✅ 14 data access helper methods (encapsulation)
-- ✅ 7 convenience query methods (lookup operations)
-- ✅ Enhanced summary with detailed statistics
-- ✅ Proper field validation for nested structures
+- ✅ 14 data access helper methods + 7 convenience query methods
 
-**Data Access Helpers:**
-```python
-# Field accessors
-get_jsp_file_path(jsp_data) -> str
-get_controller_class_name(controller_data) -> str
-get_controller_base_path(controller_data) -> str
-get_controller_methods(controller_data) -> List[Dict]
-get_service_class_name(service_data) -> str
-get_service_methods(service_data) -> List[Dict]
-get_service_dependencies(service_data) -> List[Dict]
-get_mapper_name(mapper_data) -> str
-get_mapper_namespace(mapper_data) -> str
-get_mapper_statements(mapper_data) -> List[Dict]
-get_mapper_interface_methods(mapper_data) -> List[Dict]
-
-# Convenience queries
-get_all_jsp_files() -> List[str]
-get_all_controller_classes() -> List[str]
-get_all_service_classes() -> List[str]
-get_all_mapper_namespaces() -> List[str]
-find_controller_by_path(base_path) -> Optional[Dict]
-find_service_by_class_name(class_name) -> Optional[Dict]
-find_mapper_by_namespace(namespace) -> Optional[Dict]
-```
-
-**Validation:**
-- ✅ Validates required fields based on actual analyzer output
-- ✅ Handles nested structures (e.g., `mapper.xml.namespace`)
-- ✅ Reports all validation issues without failing fast
-- ✅ Provides detailed summary with counts and statistics
-
-**Testing:**
-```
-tests/test_graph_data_loader.py
-✓ Load all analysis results (5 JSP, 2 Controllers, 2 Services, 2 Mappers)
-✓ Validate data structure
-✓ Test data access helper methods
-✓ Test convenience query methods
-✓ Handle missing optional files
-
-Results: All tests passing
-```
-
-**Mock Data:**
-- 5 JSP files
-- 2 Controller files (UserController, OrderController)
-- 2 Service files (UserService, OrderService)
-- 2 MyBatis Mapper files (UserMapper, OrderMapper)
-
-**Code Review Highlights:**
-- ✅ **EXCELLENT** - Complete, well-tested, properly documented
-- ✅ All critical recommendations implemented
-- ✅ Ready for Phase 5.1.2 (Node Creation)
-
-**Files:**
-- `mcp_server/tools/graph_data_loader.py` - 584 lines
-- `tests/test_graph_data_loader.py` - 145 lines
-- `PHASE_5_1_1_REVIEW.md` - 297 lines
+**Testing**: All tests passing (5 JSP, 2 Controllers, 2 Services, 2 Mappers)
 
 ---
 
@@ -134,178 +74,138 @@ Results: All tests passing
 | Test Suite | ✅ | `test_graph_node_builder.py` | 195 | Comprehensive tests |
 | Code Review | ✅ | `PHASE_5_1_2_REVIEW.md` | 303 | Review & recommendations |
 
-**Node Types Implemented (11 types defined, 8 used with mock data):**
-- `JSP` - JSP files (5 nodes)
-- `CONTROLLER` - Spring MVC Controllers (2 nodes)
-- `CONTROLLER_METHOD` - Controller request mapping methods (14 nodes)
-- `SERVICE` - Spring Services (2 nodes)
-- `SERVICE_METHOD` - Service business logic methods (20 nodes)
-- `MAPPER` - MyBatis Mapper interfaces (2 nodes)
-- `MAPPER_METHOD` - Mapper interface methods (21 nodes)
-- `SQL_STATEMENT` - MyBatis SQL statements (21 nodes)
-- `TABLE` - Database tables (0 - no schema in mock data)
-- `VIEW` - Database views (0 - no schema in mock data)
-- `PROCEDURE` - Oracle procedures (0 - no schema in mock data)
-
 **Total Nodes Created**: 87 nodes from mock data
+- JSP: 5 nodes
+- CONTROLLER: 2 nodes
+- CONTROLLER_METHOD: 14 nodes
+- SERVICE: 2 nodes
+- SERVICE_METHOD: 20 nodes
+- MAPPER: 2 nodes
+- MAPPER_METHOD: 21 nodes
+- SQL_STATEMENT: 21 nodes
 
-**Node Structure:**
-```python
-class Node:
-    id: str          # e.g., "CONTROLLER:com.example.controller.UserController"
-    type: str        # Node type (from NODE_TYPES)
-    name: str        # Display name (e.g., "UserController")
-    path: str        # Full path (normalized with forward slashes)
-    metadata: Dict   # Type-specific attributes
-    color: str       # Visualization color
-    shape: str       # Visualization shape
-```
-
-**Key Features:**
+**Key Features**:
 - ✅ Clean hierarchical IDs (package.ClassName format)
-- ✅ Path normalization (forward slashes for cross-platform)
-- ✅ Class identifier extraction (package.ClassName)
-- ✅ Rich metadata for each node type
+- ✅ Path normalization (cross-platform)
+- ✅ Rich metadata per node type
 - ✅ Visualization attributes (color, shape)
-- ✅ Deduplication with node_ids set
-- ✅ Helper methods (get_node_by_id, get_nodes_by_type, get_summary)
+- ✅ Node equality and hashing support
 
-**Helper Methods:**
-```python
-# Path and identifier utilities
-_normalize_path(path) -> str  # Convert backslashes to forward slashes
-_extract_class_identifier(class_name, package) -> str  # package.ClassName
-
-# Node lookup
-get_node_by_id(node_id) -> Optional[Node]
-get_nodes_by_type(node_type) -> List[Node]
-get_summary() -> Dict[str, Any]
-```
-
-**Sample Node IDs** (improved from code review):
-- JSP: `JSP:examples/mock_project/src/main/webapp/WEB-INF/views/user/list.jsp`
-- Controller: `CONTROLLER:com.example.controller.UserController`
-- Controller Method: `CONTROLLER_METHOD:com.example.controller.UserController.listUsers`
-- Service: `SERVICE:com.example.service.UserService`
-- Service Method: `SERVICE_METHOD:com.example.service.UserService.getUserList`
-- Mapper: `MAPPER:com.example.mapper.UserMapper`
-- SQL Statement: `SQL:com.example.mapper.UserMapper.selectUserList`
-
-**Testing:**
-```
-tests/test_graph_node_builder.py
-✓ Load analysis data (5 JSP, 2 Controllers, 2 Services, 2 Mappers)
-✓ Build all nodes (87 total)
-✓ Validate node types (all valid)
-✓ Validate node ID uniqueness (no duplicates)
-✓ Test node lookup methods
-✓ Test node serialization
-✓ Verify expected node counts
-
-Results: All tests passing
-```
-
-**Code Review Highlights:**
-- ✅ **EXCELLENT** - Complete, well-tested, properly documented
-- ✅ All critical recommendations implemented (path normalization, class identifier extraction)
-- ✅ Ready for Phase 5.1.3 (Edge Creation)
-
-**Files:**
-- `mcp_server/tools/graph_node_builder.py` - 631 lines
-- `tests/test_graph_node_builder.py` - 195 lines
-- `PHASE_5_1_2_REVIEW.md` - 303 lines
+**Testing**: All tests passing
 
 ---
 
-#### Phase 5.1.3: Edge Creation 📝 PLANNED
+#### Phase 5.1.3: Edge Creation ✅ COMPLETE
 
 **Goal**: Create edges representing relationships between nodes.
 
-**Planned Edge Types:**
-- `INCLUDES` - JSP includes another JSP
-- `AJAX_CALL` - JSP makes AJAX call to controller
-- `FORM_SUBMIT` - JSP form submits to controller
-- `INVOKES` - Controller method calls service method
-- `CALLS` - Service method calls mapper method
-- `QUERIES` - Mapper statement queries table
-- `MODIFIES` - Mapper statement modifies table (INSERT/UPDATE/DELETE)
-- `DEPENDS_ON` - Service depends on other services/mappers
+**Implementation:**
 
-**Edge Attributes:**
-- `source`: Source node ID
-- `target`: Target node ID
-- `type`: Edge type (from above list)
-- `metadata`: Type-specific attributes (HTTP method, SQL operation, etc.)
+| Component | Status | File | Lines | Description |
+|-----------|--------|------|-------|-------------|
+| Edge Class | ✅ | `graph_edge_builder.py` | 67 | Edge with confidence scoring |
+| EdgeBuilder | ✅ | `graph_edge_builder.py` | 466 | Edge creation from nodes |
+| Test Suite | ✅ | `test_graph_edge_builder.py` | 191 | Comprehensive tests |
+| Code Review | ✅ | `PHASE_5_1_3_REVIEW.md` | 494 | Review & recommendations |
+
+**Total Edges Created**: 21 edges from mock data
+- EXECUTES (Mapper→SQL): 21 edges (100% coverage!)
+
+**Edge Types Implemented** (10 types):
+- INCLUDES (JSP→JSP)
+- CALLS (JSP→Controller)
+- INVOKES (Controller→Service)
+- USES (Service→Mapper)
+- EXECUTES (Mapper→SQL) ✅ Working
+- QUERIES (SQL→Table)
+- MODIFIES (SQL→Table)
+- CALLS_PROCEDURE (SQL→Procedure)
+- TRIGGERED_BY (Trigger→Procedure)
+- SCHEDULED_BY (Job→Procedure)
+
+**Key Features**:
+- ✅ 10 edge types with confidence scoring
+- ✅ Edge equality based on (source, target, type)
+- ✅ Edge deduplication with set
+- ✅ Fuzzy matching for Controller→Service, Service→Mapper
+- ✅ Validation in Edge.__init__
+
+**Testing**: All tests passing, no regressions
 
 ---
 
-#### Phase 5.1.4: Graph Construction 📝 PLANNED
+#### Phase 5.1.4: Graph Construction ✅ COMPLETE
 
 **Goal**: Build NetworkX graph from nodes and edges.
 
 **Implementation:**
-```python
-import networkx as nx
 
-class GraphBuilder:
-    def __init__(self):
-        self.graph = nx.DiGraph()
+| Component | Status | File | Lines | Description |
+|-----------|--------|------|-------|-------------|
+| CodeGraphBuilder | ✅ | `code_graph_builder.py` | 504 | NetworkX DiGraph orchestrator |
+| Test Suite | ✅ | `test_code_graph_builder.py` | 232 | Comprehensive tests |
+| Code Review | ✅ | `PHASE_5_1_4_REVIEW.md` | 514 | Review & recommendations |
 
-    def build_graph(self, nodes: List[Dict], edges: List[Dict]) -> nx.DiGraph:
-        """Build NetworkX graph from nodes and edges."""
-        # Add nodes
-        for node in nodes:
-            self.graph.add_node(node['id'], **node)
+**Graph Statistics**:
+- Total nodes: 87
+- Total edges: 21
+- Graph density: 0.0028 (sparse)
+- Connected components: 66
+- Orphan nodes: 45
+- Source nodes: 21 (mapper methods)
+- Sink nodes: 21 (SQL statements)
 
-        # Add edges
-        for edge in edges:
-            self.graph.add_edge(
-                edge['source'],
-                edge['target'],
-                type=edge['type'],
-                **edge.get('metadata', {})
-            )
+**Coverage Metrics**:
+- jsp_with_controllers: 0.0 (no JSP edges in mock data)
+- controllers_with_services: 0.0 (no Controller→Service edges in mock data)
+- services_with_mappers: 0.0 (no Service→Mapper edges in mock data)
+- mappers_with_sql: 1.0 (100% ✅)
 
-        return self.graph
-```
+**Key Features**:
+- ✅ NetworkX DiGraph integration
+- ✅ 6-step graph building process
+- ✅ Fixed critical lazy loading bug
+- ✅ Comprehensive statistics (15+ metrics)
+- ✅ Graph validation (self-loops, confidence, attributes)
+- ✅ 3-file export system
 
----
+**Exported Files**:
+- `output/graph/code_based_graph.json` (60,647 bytes)
+- `output/graph/low_confidence_edges.json` (134 bytes, 0 edges)
+- `output/graph/graph_statistics.json` (856 bytes)
 
-### Phase 5.2: Graph Builder - Layer 2 (LLM-verified) 📝 PLANNED
+**Testing**: All tests passing
 
-Use LLM to fill gaps in code-based graph with high-confidence inferences.
-
-#### Phase 5.2.1: Gap Detection
-- Detect missing relationships
-- Identify ambiguous code patterns
-- Find incomplete type information
-
-#### Phase 5.2.2: LLM Verification
-- Query Claude for relationship verification
-- Extract confidence scores
-- Validate inferences against code
-
-#### Phase 5.2.3: Graph Merger
-- Merge Layer 1 (code-based) + Layer 2 (LLM-verified)
-- Mark confidence levels on edges
-- Preserve 100% certainty for code-based relationships
+**Code Review Score**: 9.5/10 (Excellent)
 
 ---
 
-### Phase 5.3: Graph Export & Visualization 📝 PLANNED
+### Phase 5.4: Visualization 🔄 IN PROGRESS
 
-#### Phase 5.3.1: JSON Export
-- Export graph to JSON format
-- Include all nodes, edges, and metadata
+**Goal**: Create interactive and static visualizations of the knowledge graph.
 
-#### Phase 5.3.2: Neo4j Export
-- Convert to Cypher statements
-- Support Neo4j import
+**Status**: Starting implementation
 
-#### Phase 5.3.3: Visualization
-- PyVis interactive HTML
-- Mermaid diagrams
-- GraphViz static images
+**Planned Components**:
+- PyVis Interactive HTML
+- Mermaid Diagram Generator
+- GraphViz DOT Export
+
+---
+
+### Phase 5.2: Graph Builder - Layer 2 (LLM-based) 📝 DEFERRED
+
+**Reason**: Visualization takes priority for immediate graph exploration.
+
+**Will implement after Phase 5.4 complete**.
+
+---
+
+### Phase 5.3: Graph Merger 📝 DEFERRED
+
+**Reason**: Depends on Phase 5.2 (LLM-based graph).
+
+**Will implement after Phase 5.2 complete**.
 
 ---
 
@@ -315,57 +215,53 @@ Use LLM to fill gaps in code-based graph with high-confidence inferences.
 |-------|--------|------------|
 | 5.1.1 Data Loader | ✅ Complete | 100% |
 | 5.1.2 Node Creation | ✅ Complete | 100% |
-| 5.1.3 Edge Creation | 📝 Planned | 0% |
-| 5.1.4 Graph Construction | 📝 Planned | 0% |
-| 5.2 Layer 2 (LLM) | 📝 Planned | 0% |
-| 5.3 Export & Visualization | 📝 Planned | 0% |
+| 5.1.3 Edge Creation | ✅ Complete | 100% |
+| 5.1.4 Graph Construction | ✅ Complete | 100% |
+| 5.4 Visualization | 🔄 In Progress | 0% |
+| 5.2 Layer 2 (LLM) | 📝 Deferred | 0% |
+| 5.3 Graph Merger | 📝 Deferred | 0% |
 
-**Overall Phase 5 Progress:** ~30% (Phase 5.1.1-5.1.2 complete, 4 sub-phases remaining)
+**Overall Phase 5 Progress:** ~60% (Phase 5.1 complete with 4/4 sub-phases, visualization starting)
 
 ---
 
 ## Implementation Statistics
 
-### Code Metrics (Phase 5.1.1-5.1.2)
+### Code Metrics (Phase 5.1.1-5.1.4)
 
 | Category | Files | Lines | Description |
 |----------|-------|-------|-------------|
 | Data Loader | 1 | 584 | GraphDataLoader with helpers |
-| Node Builder | 1 | 631 | GraphNodeBuilder with 11 node types |
-| Tests | 2 | 340 | Comprehensive test suites (Data + Nodes) |
-| Documentation | 2 | 600 | Code reviews & recommendations |
-| **Total** | **6** | **2,155** | **Phase 5.1.1-5.1.2 complete** |
+| Node Builder | 1 | 631 | NodeBuilder with 11 node types |
+| Edge Builder | 1 | 533 | EdgeBuilder with 10 edge types |
+| Graph Builder | 1 | 504 | CodeGraphBuilder with NetworkX |
+| Tests | 4 | 763 | Comprehensive test suites |
+| Documentation | 5 | 1,622 | Code reviews & progress tracking |
+| **Total** | **13** | **4,637** | **Phase 5.1 complete** |
 
 ---
 
 ## Next Steps
 
-1. **Phase 5.1.2: Node Creation** (Next immediate task)
-   - [ ] Implement `GraphNodeBuilder` class
-   - [ ] Build JSP page nodes
-   - [ ] Build controller & controller method nodes
-   - [ ] Build service & service method nodes
-   - [ ] Build mapper & mapper method nodes
-   - [ ] Build SQL statement nodes
-   - [ ] Add node validation
+1. **Phase 5.4: Visualization** (Current)
+   - [x] Update PHASE_5_PROGRESS.md
+   - [ ] Implement PyVis Interactive HTML
+   - [ ] Implement Mermaid Diagram Generator
+   - [ ] Implement GraphViz DOT Export
    - [ ] Create test suite
    - [ ] Code review & implement suggestions
+   - [ ] Commit & push
 
-2. **Phase 5.1.3: Edge Creation** (After 5.1.2)
-   - [ ] Implement `GraphEdgeBuilder` class
-   - [ ] Build JSP relationship edges
-   - [ ] Build controller-service edges
-   - [ ] Build service-mapper edges
-   - [ ] Build mapper-SQL edges
-   - [ ] Add edge validation
-   - [ ] Create test suite
+2. **Phase 5.2: LLM-based Graph** (After 5.4)
+   - [ ] Semantic cache implementation
+   - [ ] LLM query engine
+   - [ ] URL pattern matching
+   - [ ] Confidence scoring
 
-3. **Phase 5.1.4: Graph Construction** (After 5.1.3)
-   - [ ] Implement `GraphBuilder` class
-   - [ ] Build NetworkX DiGraph
-   - [ ] Add graph validation
-   - [ ] Add graph statistics
-   - [ ] Create test suite
+3. **Phase 5.3: Graph Merger** (After 5.2)
+   - [ ] Conflict detection
+   - [ ] Resolution rules
+   - [ ] Merge algorithm
 
 ---
 
@@ -373,11 +269,13 @@ Use LLM to fill gaps in code-based graph with high-confidence inferences.
 
 - [Phase 5 Plan](PHASE_5_PLAN.md)
 - [Phase 5.1.1 Review](PHASE_5_1_1_REVIEW.md)
-- [GraphDataLoader Implementation](mcp_server/tools/graph_data_loader.py)
-- [Test Suite](tests/test_graph_data_loader.py)
+- [Phase 5.1.2 Review](PHASE_5_1_2_REVIEW.md)
+- [Phase 5.1.3 Review](PHASE_5_1_3_REVIEW.md)
+- [Phase 5.1.4 Review](PHASE_5_1_4_REVIEW.md)
+- [Code Review (5.1.3-5.1.4)](CODE_REVIEW_PHASE_5_1_3_5_1_4.md)
 
 ---
 
 **Last Updated:** 2025-10-05
 **Version:** 0.5.0-alpha
-**Current Phase:** 5.1.2 Complete ✅
+**Current Phase:** 5.4 Visualization 🔄
