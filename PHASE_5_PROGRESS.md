@@ -1,6 +1,6 @@
 # Phase 5: Knowledge Graph Building Progress
 
-**Status**: Phase 5.1.1 Complete ✅
+**Status**: Phase 5.1.2 Complete ✅
 **Version**: 0.5.0-alpha
 **Date**: 2025-10-05
 
@@ -17,7 +17,7 @@ Phase 5 focuses on building a comprehensive knowledge graph from all Phase 3 ana
 │              Phase 5: Knowledge Graph Builder           │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 1: Code-Based (Parser-First)                     │
-│  ✓ GraphDataLoader    [ ] GraphNodeBuilder             │
+│  ✓ GraphDataLoader    ✓ GraphNodeBuilder               │
 │  [ ] GraphEdgeBuilder  [ ] NetworkX Graph Constructor   │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 2: LLM-Verified Gap Filling (Future)             │
@@ -121,53 +121,99 @@ Results: All tests passing
 
 ---
 
-#### Phase 5.1.2: Node Creation 📝 PLANNED
+#### Phase 5.1.2: Node Creation ✅ COMPLETE
 
 **Goal**: Create graph nodes from loaded data.
 
-**Planned Node Types:**
-- `JSP_PAGE` - JSP files
-- `CONTROLLER` - Spring MVC Controllers
-- `CONTROLLER_METHOD` - Controller request mapping methods
-- `SERVICE` - Spring Services
-- `SERVICE_METHOD` - Service business logic methods
-- `MAPPER` - MyBatis Mapper interfaces
-- `MAPPER_METHOD` - Mapper interface methods
-- `SQL_STATEMENT` - MyBatis SQL statements
-- `DATABASE_TABLE` - Database tables (if schema available)
-- `STORED_PROCEDURE` - Oracle procedures (if available)
+**Implementation:**
 
-**Node Attributes:**
-- `id`: Unique identifier
-- `type`: Node type (from above list)
-- `name`: Human-readable name
-- `file_path`: Source file path
-- `metadata`: Type-specific attributes (methods, parameters, etc.)
+| Component | Status | File | Lines | Description |
+|-----------|--------|------|-------|-------------|
+| Node Class | ✅ | `graph_node_builder.py` | 84 | Graph node with visualization attrs |
+| NodeBuilder | ✅ | `graph_node_builder.py` | 547 | Node creation from analysis data |
+| Test Suite | ✅ | `test_graph_node_builder.py` | 195 | Comprehensive tests |
+| Code Review | ✅ | `PHASE_5_1_2_REVIEW.md` | 303 | Review & recommendations |
 
-**Implementation Plan:**
+**Node Types Implemented (11 types defined, 8 used with mock data):**
+- `JSP` - JSP files (5 nodes)
+- `CONTROLLER` - Spring MVC Controllers (2 nodes)
+- `CONTROLLER_METHOD` - Controller request mapping methods (14 nodes)
+- `SERVICE` - Spring Services (2 nodes)
+- `SERVICE_METHOD` - Service business logic methods (20 nodes)
+- `MAPPER` - MyBatis Mapper interfaces (2 nodes)
+- `MAPPER_METHOD` - Mapper interface methods (21 nodes)
+- `SQL_STATEMENT` - MyBatis SQL statements (21 nodes)
+- `TABLE` - Database tables (0 - no schema in mock data)
+- `VIEW` - Database views (0 - no schema in mock data)
+- `PROCEDURE` - Oracle procedures (0 - no schema in mock data)
+
+**Total Nodes Created**: 87 nodes from mock data
+
+**Node Structure:**
 ```python
-class GraphNodeBuilder:
-    def __init__(self, data_loader: GraphDataLoader):
-        self.loader = data_loader
-        self.nodes = []
-
-    def build_all_nodes(self) -> List[Dict]:
-        """Build all nodes from loaded data."""
-        self.nodes = []
-        self.nodes.extend(self._build_jsp_nodes())
-        self.nodes.extend(self._build_controller_nodes())
-        self.nodes.extend(self._build_service_nodes())
-        self.nodes.extend(self._build_mapper_nodes())
-        return self.nodes
-
-    def _build_jsp_nodes(self) -> List[Dict]:
-        """Build JSP page nodes."""
-        ...
-
-    def _build_controller_nodes(self) -> List[Dict]:
-        """Build controller and controller method nodes."""
-        ...
+class Node:
+    id: str          # e.g., "CONTROLLER:com.example.controller.UserController"
+    type: str        # Node type (from NODE_TYPES)
+    name: str        # Display name (e.g., "UserController")
+    path: str        # Full path (normalized with forward slashes)
+    metadata: Dict   # Type-specific attributes
+    color: str       # Visualization color
+    shape: str       # Visualization shape
 ```
+
+**Key Features:**
+- ✅ Clean hierarchical IDs (package.ClassName format)
+- ✅ Path normalization (forward slashes for cross-platform)
+- ✅ Class identifier extraction (package.ClassName)
+- ✅ Rich metadata for each node type
+- ✅ Visualization attributes (color, shape)
+- ✅ Deduplication with node_ids set
+- ✅ Helper methods (get_node_by_id, get_nodes_by_type, get_summary)
+
+**Helper Methods:**
+```python
+# Path and identifier utilities
+_normalize_path(path) -> str  # Convert backslashes to forward slashes
+_extract_class_identifier(class_name, package) -> str  # package.ClassName
+
+# Node lookup
+get_node_by_id(node_id) -> Optional[Node]
+get_nodes_by_type(node_type) -> List[Node]
+get_summary() -> Dict[str, Any]
+```
+
+**Sample Node IDs** (improved from code review):
+- JSP: `JSP:examples/mock_project/src/main/webapp/WEB-INF/views/user/list.jsp`
+- Controller: `CONTROLLER:com.example.controller.UserController`
+- Controller Method: `CONTROLLER_METHOD:com.example.controller.UserController.listUsers`
+- Service: `SERVICE:com.example.service.UserService`
+- Service Method: `SERVICE_METHOD:com.example.service.UserService.getUserList`
+- Mapper: `MAPPER:com.example.mapper.UserMapper`
+- SQL Statement: `SQL:com.example.mapper.UserMapper.selectUserList`
+
+**Testing:**
+```
+tests/test_graph_node_builder.py
+✓ Load analysis data (5 JSP, 2 Controllers, 2 Services, 2 Mappers)
+✓ Build all nodes (87 total)
+✓ Validate node types (all valid)
+✓ Validate node ID uniqueness (no duplicates)
+✓ Test node lookup methods
+✓ Test node serialization
+✓ Verify expected node counts
+
+Results: All tests passing
+```
+
+**Code Review Highlights:**
+- ✅ **EXCELLENT** - Complete, well-tested, properly documented
+- ✅ All critical recommendations implemented (path normalization, class identifier extraction)
+- ✅ Ready for Phase 5.1.3 (Edge Creation)
+
+**Files:**
+- `mcp_server/tools/graph_node_builder.py` - 631 lines
+- `tests/test_graph_node_builder.py` - 195 lines
+- `PHASE_5_1_2_REVIEW.md` - 303 lines
 
 ---
 
@@ -268,26 +314,27 @@ Use LLM to fill gaps in code-based graph with high-confidence inferences.
 | Phase | Status | Completion |
 |-------|--------|------------|
 | 5.1.1 Data Loader | ✅ Complete | 100% |
-| 5.1.2 Node Creation | 📝 Planned | 0% |
+| 5.1.2 Node Creation | ✅ Complete | 100% |
 | 5.1.3 Edge Creation | 📝 Planned | 0% |
 | 5.1.4 Graph Construction | 📝 Planned | 0% |
 | 5.2 Layer 2 (LLM) | 📝 Planned | 0% |
 | 5.3 Export & Visualization | 📝 Planned | 0% |
 
-**Overall Phase 5 Progress:** ~15% (Phase 5.1.1 complete, 5 sub-phases remaining)
+**Overall Phase 5 Progress:** ~30% (Phase 5.1.1-5.1.2 complete, 4 sub-phases remaining)
 
 ---
 
 ## Implementation Statistics
 
-### Code Metrics (Phase 5.1.1)
+### Code Metrics (Phase 5.1.1-5.1.2)
 
 | Category | Files | Lines | Description |
 |----------|-------|-------|-------------|
 | Data Loader | 1 | 584 | GraphDataLoader with helpers |
-| Tests | 1 | 145 | Comprehensive test suite |
-| Documentation | 1 | 297 | Code review & recommendations |
-| **Total** | **3** | **1,026** | **Phase 5.1.1 complete** |
+| Node Builder | 1 | 631 | GraphNodeBuilder with 11 node types |
+| Tests | 2 | 340 | Comprehensive test suites (Data + Nodes) |
+| Documentation | 2 | 600 | Code reviews & recommendations |
+| **Total** | **6** | **2,155** | **Phase 5.1.1-5.1.2 complete** |
 
 ---
 
@@ -333,4 +380,4 @@ Use LLM to fill gaps in code-based graph with high-confidence inferences.
 
 **Last Updated:** 2025-10-05
 **Version:** 0.5.0-alpha
-**Current Phase:** 5.1.1 Complete ✅
+**Current Phase:** 5.1.2 Complete ✅
