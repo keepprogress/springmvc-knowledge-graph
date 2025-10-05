@@ -47,7 +47,7 @@ from mcp_server.tools.service_analyzer import ServiceAnalyzer
 from mcp_server.tools.mybatis_analyzer import MyBatisAnalyzer
 
 # Import configuration
-from mcp_server.config import QUERY, CACHE, ANALYZER, SERVER
+from mcp_server.config import QUERY, CACHE, ANALYZER
 
 # Import Phase 4 slash commands
 from mcp_server.commands import (
