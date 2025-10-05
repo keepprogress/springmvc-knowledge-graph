@@ -46,6 +46,9 @@ from mcp_server.tools.controller_analyzer import ControllerAnalyzer
 from mcp_server.tools.service_analyzer import ServiceAnalyzer
 from mcp_server.tools.mybatis_analyzer import MyBatisAnalyzer
 
+# Import configuration
+from mcp_server.config import QUERY, CACHE, ANALYZER, SERVER
+
 # Import Phase 4 slash commands
 from mcp_server.commands import (
     AnalyzeJSPCommand,
@@ -644,9 +647,9 @@ class SpringMVCMCPServer:
         """Handle find_chain tool call (Phase 4.4)"""
         start_node = kwargs.get("start_node")
         end_node = kwargs.get("end_node")
-        max_depth = kwargs.get("max_depth", 10)
+        max_depth = kwargs.get("max_depth", QUERY.DEFAULT_MAX_DEPTH_CHAIN)
         project_path = kwargs.get("project_path", str(self.project_root))
-        cache_dir = kwargs.get("cache_dir", ".batch_cache")
+        cache_dir = kwargs.get("cache_dir", CACHE.DEFAULT_CACHE_DIR)
 
         if not start_node:
             return {"success": False, "error": "start_node is required"}
@@ -696,9 +699,9 @@ class SpringMVCMCPServer:
         """Handle impact_analysis tool call (Phase 4.4)"""
         node = kwargs.get("node")
         direction = kwargs.get("direction", "both")
-        max_depth = kwargs.get("max_depth", 5)
+        max_depth = kwargs.get("max_depth", QUERY.DEFAULT_MAX_DEPTH_IMPACT)
         project_path = kwargs.get("project_path", str(self.project_root))
-        cache_dir = kwargs.get("cache_dir", ".batch_cache")
+        cache_dir = kwargs.get("cache_dir", CACHE.DEFAULT_CACHE_DIR)
 
         if not node:
             return {"success": False, "error": "node is required"}

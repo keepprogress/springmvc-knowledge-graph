@@ -12,11 +12,14 @@ import pickle
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from ..config import CACHE
+
 
 class AnalysisCache:
     """Caches analysis results for incremental analysis"""
 
-    def __init__(self, cache_dir: str = ".batch_cache"):
+    def __init__(self, cache_dir: str = None):
+        cache_dir = cache_dir if cache_dir is not None else CACHE.DEFAULT_CACHE_DIR
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.metadata_file = self.cache_dir / "metadata.json"

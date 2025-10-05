@@ -19,6 +19,7 @@ from .parallel_executor import ParallelExecutor, AnalysisTask, BatchResult
 from .progress_tracker import ProgressTracker
 from .analysis_cache import AnalysisCache
 from .dependency_graph import DependencyGraphBuilder
+from ..config import ANALYZER, CACHE
 
 
 @dataclass
@@ -64,10 +65,10 @@ class BatchAnalyzer:
         self,
         project_root: str,
         analyzers: Dict[str, Any],
-        max_workers: int = 10,
-        use_cache: bool = True,
-        cache_dir: str = ".batch_cache",
-        show_progress: bool = True
+        max_workers: int = None,
+        use_cache: bool = None,
+        cache_dir: str = None,
+        show_progress: bool = None
     ):
         """
         Initialize batch analyzer
@@ -82,12 +83,15 @@ class BatchAnalyzer:
         """
         self.project_root = Path(project_root)
         self.analyzers = analyzers
-        self.max_workers = max_workers
-        self.use_cache = use_cache
-        self.show_progress = show_progress
+        self.max_workers = max_workers if max_workers is not None else ANALYZER.DEFAULT_MAX_WORKERS
+        self.use_cache = use_cache if use_cache is not None else CACHE.USE_CACHE
+        self.show_progress = show_progress if show_progress is not None else ANALYZER.SHOW_PROGRESS
+
+        # Resolve cache_dir
+        cache_dir = cache_dir if cache_dir is not None else CACHE.DEFAULT_CACHE_DIR
 
         # Initialize cache
-        self.cache = AnalysisCache(cache_dir) if use_cache else None
+        self.cache = AnalysisCache(cache_dir) if self.use_cache else None
 
     async def analyze_project(
         self,

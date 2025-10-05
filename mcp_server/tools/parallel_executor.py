@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base_tool import BaseTool
+from ..config import ANALYZER
 
 
 @dataclass
@@ -78,7 +79,7 @@ class ParallelExecutor:
     def __init__(
         self,
         analyzers: Dict[str, BaseTool],
-        max_workers: int = 10,
+        max_workers: int = None,
         timeout_per_task: float = 30.0,
         timeouts_by_type: Optional[Dict[str, float]] = None,
         batch_size: int = 100
@@ -94,10 +95,10 @@ class ParallelExecutor:
             batch_size: Number of tasks to process in each batch (prevents file descriptor exhaustion)
         """
         self.analyzers = analyzers
-        self.max_workers = max_workers
+        self.max_workers = max_workers if max_workers is not None else ANALYZER.DEFAULT_MAX_WORKERS
         self.timeout_per_task = timeout_per_task
         self.batch_size = batch_size
-        self.semaphore = asyncio.Semaphore(max_workers)
+        self.semaphore = asyncio.Semaphore(self.max_workers)
 
         # Merge default timeouts with custom timeouts
         self.timeouts = self.DEFAULT_TIMEOUTS.copy()

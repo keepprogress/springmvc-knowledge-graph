@@ -11,6 +11,7 @@ import asyncio
 from typing import Any, Dict, List
 
 from .base_command import BaseCommand, validate_args
+from ..config import ANALYZER, CACHE
 
 
 class AnalyzeAllCommand(BaseCommand):
@@ -59,8 +60,8 @@ Examples:
         parser.add_argument(
             '--parallel', '-p',
             type=int,
-            default=10,
-            help='Number of parallel workers (default: 10)'
+            default=ANALYZER.DEFAULT_MAX_WORKERS,
+            help=f'Number of parallel workers (default: {ANALYZER.DEFAULT_MAX_WORKERS})'
         )
 
         parser.add_argument(
@@ -77,8 +78,8 @@ Examples:
 
         parser.add_argument(
             '--cache-dir',
-            default='.batch_cache',
-            help='Cache directory (default: .batch_cache)'
+            default=CACHE.DEFAULT_CACHE_DIR,
+            help=f'Cache directory (default: {CACHE.DEFAULT_CACHE_DIR})'
         )
 
         parser.add_argument(

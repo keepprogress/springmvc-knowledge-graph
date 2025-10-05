@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base_command import BaseCommand, validate_args
-from ..config import QUERY
+from ..config import QUERY, CACHE
 
 
 class ImpactAnalysisCommand(BaseCommand):
@@ -78,8 +78,8 @@ Examples:
 
         parser.add_argument(
             '--cache-dir',
-            default='.batch_cache',
-            help='Cache directory for loading previous analysis (default: .batch_cache)'
+            default=CACHE.DEFAULT_CACHE_DIR,
+            help=f'Cache directory for loading previous analysis (default: {CACHE.DEFAULT_CACHE_DIR})'
         )
 
         return parser
