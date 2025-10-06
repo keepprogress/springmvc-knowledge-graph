@@ -57,7 +57,9 @@ from mcp_server.commands import (
     AnalyzeMyBatisCommand,
     AnalyzeAllCommand,
     FindChainCommand,
-    ImpactAnalysisCommand
+    ImpactAnalysisCommand,
+    BuildGraphCommand,
+    GraphStatsCommand
 )
 
 
@@ -104,6 +106,11 @@ class SpringMVCMCPServer:
             'chain': FindChainCommand(self),  # Alias
             'impact-analysis': ImpactAnalysisCommand(self),
             'impact': ImpactAnalysisCommand(self),  # Alias
+            # Phase 6.1 - Graph Building Commands
+            'build-graph': BuildGraphCommand(self),
+            'graph': BuildGraphCommand(self),  # Alias
+            'graph-stats': GraphStatsCommand(self),
+            'stats': GraphStatsCommand(self),  # Alias
         }
 
         # Initialize tool and command registry
