@@ -11,8 +11,9 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
+from time import time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,12 +22,13 @@ logger = logging.getLogger(__name__)
 class SemanticCache:
     """Cache LLM query results based on semantic code similarity."""
 
-    def __init__(self, cache_dir: str = ".llm_cache"):
+    def __init__(self, cache_dir: str = ".llm_cache", rate_limit_per_minute: int = 60):
         """
         Initialize semantic cache.
 
         Args:
             cache_dir: Directory to store cache files
+            rate_limit_per_minute: Maximum LLM queries per minute (default: 60)
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -38,6 +40,10 @@ class SemanticCache:
         self.hits = self.cache_index.get("_stats", {}).get("hits", 0)
         self.misses = self.cache_index.get("_stats", {}).get("misses", 0)
         self.total_tokens_saved = self.cache_index.get("_stats", {}).get("total_tokens_saved", 0)
+
+        # Rate limiting
+        self.rate_limit = rate_limit_per_minute
+        self.query_timestamps: List[float] = []
 
         # Remove stats from index if present
         if "_stats" in self.cache_index:
@@ -113,16 +119,18 @@ class SemanticCache:
         """
         Create semantic hash for caching.
 
+        Uses SHA256 for better collision resistance and future-proofing.
+
         Args:
             code: Source code to hash
             query_type: Type of query (e.g., "verify_relationship", "match_url")
 
         Returns:
-            MD5 hash string
+            SHA256 hash string
         """
         normalized = self._normalize_code(code)
         hash_input = f"{normalized}:{query_type}"
-        return hashlib.md5(hash_input.encode('utf-8')).hexdigest()
+        return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
     def get(self, code: str, query_type: str) -> Optional[Dict[str, Any]]:
         """
@@ -171,6 +179,26 @@ class SemanticCache:
         logger.info(f"Cache MISS: {query_type}")
 
         return None
+
+    def check_rate_limit(self):
+        """
+        Check if rate limit allows new query.
+
+        Raises:
+            Exception: If rate limit exceeded
+        """
+        now = time()
+        # Remove timestamps older than 1 minute
+        self.query_timestamps = [t for t in self.query_timestamps if now - t < 60]
+
+        if len(self.query_timestamps) >= self.rate_limit:
+            raise Exception(
+                f"Rate limit exceeded: {self.rate_limit} queries per minute. "
+                f"Please wait before making more requests."
+            )
+
+        # Record this query timestamp
+        self.query_timestamps.append(now)
 
     def set(self, code: str, query_type: str, result: Dict[str, Any],
             estimated_tokens: int = 0):

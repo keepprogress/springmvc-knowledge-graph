@@ -166,6 +166,18 @@ class LLMQueryEngine:
             source_code, target_code, relationship_type, context or {}
         )
 
+        # Check rate limit before querying LLM
+        try:
+            self.cache.check_rate_limit()
+        except Exception as e:
+            logger.warning(f"Rate limit check: {e}")
+            return {
+                "match": False,
+                "confidence": 0.0,
+                "reasoning": str(e),
+                "method": "rate_limited"
+            }
+
         # Query LLM
         try:
             result = await self._query_llm(prompt)

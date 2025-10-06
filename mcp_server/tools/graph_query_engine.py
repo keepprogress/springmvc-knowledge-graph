@@ -49,7 +49,7 @@ class GraphQueryEngine:
             try:
                 self._betweenness_cache = nx.betweenness_centrality(self.graph)
                 logger.debug(f"Calculated betweenness centrality for {len(self.graph.nodes())} nodes")
-            except Exception as e:
+            except nx.NetworkXError as e:
                 logger.warning(f"Failed to calculate betweenness centrality: {e}")
                 self._betweenness_cache = defaultdict(float)
 
@@ -68,7 +68,7 @@ class GraphQueryEngine:
             try:
                 self._closeness_cache = nx.closeness_centrality(self.graph)
                 logger.debug(f"Calculated closeness centrality for {len(self.graph.nodes())} nodes")
-            except Exception as e:
+            except nx.NetworkXError as e:
                 logger.warning(f"Failed to calculate closeness centrality: {e}")
                 self._closeness_cache = defaultdict(float)
 
